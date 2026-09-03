@@ -347,13 +347,17 @@ const appEmployees = {
 
       utils.showToast(`Đã chuyển thành công ${successCount}/${employeeIds.length} nhân sự vào Thùng rác!`, 'success');
       
+      // Xóa sạch danh sách ID đã chọn và ẩn thanh công cụ
       this.selectedIds.clear();
       this.updateBulkDeleteBar();
 
-      // Cập nhật lại dữ liệu
+      // Đồng bộ lại dữ liệu từ server và render lại ngay lập tức
       await appData.init();
       appDashboard.init();
       if (typeof appTrash !== 'undefined') appTrash.render();
+      
+      // Ép gọi lại applyFilters để bảng nhân sự cập nhật giao diện ngay lập tức
+      this.currentPage = 1;
       this.applyFilters();
     } catch (err) {
       console.error(err);
