@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khởi Tạo Hệ Thống HRM TRUNG HẢI - Setup Wizard</title>
+  
+  <!-- FontAwesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Setup Stylesheet -->
+  <link rel="stylesheet" href="css/setup.css">
+</head>
+<body>
+
+  <div class="setup-container">
+    
+    <!-- Top Header -->
+    <header class="setup-header">
+      <div class="setup-brand">
+        <div class="setup-brand-logo">TH</div>
+        <div class="setup-brand-text">
+          <h1>TRUNG HẢI HRM - INITIAL SETUP</h1>
+          <p>Trình hướng dẫn thiết lập Cơ sở dữ liệu Cloud & Tài khoản Quản trị</p>
+        </div>
+      </div>
+      <div class="setup-badge-version">
+        <i class="fa-solid fa-shield-halved"></i> v2.5 Enterprise
+      </div>
+    </header>
+
+    <!-- Stepper Navigation -->
+    <nav class="setup-stepper">
+      <div class="step-item active" id="step-nav-1">
+        <div class="step-circle">1</div>
+        <span class="step-title">Google Cloud</span>
+      </div>
+      <div class="step-item" id="step-nav-2">
+        <div class="step-circle">2</div>
+        <span class="step-title">Khóa JSON</span>
+      </div>
+      <div class="step-item" id="step-nav-3">
+        <div class="step-circle">3</div>
+        <span class="step-title">Google Sheet</span>
+      </div>
+      <div class="step-item" id="step-nav-4">
+        <div class="step-circle">4</div>
+        <span class="step-title">Dữ liệu mẫu</span>
+      </div>
+      <div class="step-item" id="step-nav-5">
+        <div class="step-circle">5</div>
+        <span class="step-title">Tài khoản Admin</span>
+      </div>
+    </nav>
+
+    <!-- Body Panels -->
+    <div class="setup-body">
+
+      <!-- ==========================================
+           BƯỚC 1: HƯỚNG DẪN GOOGLE CLOUD
+           ========================================== -->
+      <section class="step-panel active" id="step-panel-1">
+        <div class="step-panel-title">
+          <i class="fa-brands fa-google" style="color: #4285F4;"></i>
+          <span>Bước 1: Chuẩn bị Google Cloud Project & Service Account</span>
+        </div>
+        <p class="step-panel-desc">
+          Hệ thống HRM TRUNG HẢI sử dụng Google Sheets làm Cơ sở dữ liệu Cloud độc quyền của riêng bạn. Hãy thực hiện 3 thao tác đơn giản sau trên tài khoản Google của công ty:
+        </p>
+
+        <div class="guide-accordion">
+          <!-- Step 1.1 -->
+          <div class="guide-card">
+            <div class="guide-title">
+              <span class="guide-step-num">1</span>
+              <span>Tạo Google Cloud Project & Bật API</span>
+            </div>
+            <div class="guide-content">
+              Truy cập <a href="https://console.cloud.google.com" target="_blank"><i class="fa-solid fa-arrow-up-right-from-square"></i> Google Cloud Console</a>, tạo một Project mới (ví dụ: <span class="code-pill">hrm-company-db</span>), sau đó vào mục <strong>APIs & Services > Library</strong> và bật (Enable) 2 API sau:
+              <div style="margin-top: 6px;">
+                <span class="code-pill">Google Sheets API</span> và <span class="code-pill">Google Drive API</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 1.2 -->
+          <div class="guide-card">
+            <div class="guide-title">
+              <span class="guide-step-num">2</span>
+              <span>Tạo Service Account (Tài khoản dịch vụ)</span>
+            </div>
+            <div class="guide-content">
+              Vào <strong>IAM & Admin > Service Accounts</strong> > bấm <strong>Create Service Account</strong>. Đặt tên (ví dụ: <span class="code-pill">hrm-sheet-service</span>), cấp quyền Role: <span class="code-pill">Editor</span> và nhấn hoàn tất.
+            </div>
+          </div>
+
+          <!-- Step 1.3 -->
+          <div class="guide-card">
+            <div class="guide-title">
+              <span class="guide-step-num">3</span>
+              <span>Tải Khóa riêng tư (Private Key JSON)</span>
+            </div>
+            <div class="guide-content">
+              Nhấp vào Service Account vừa tạo > chọn tab <strong>Keys</strong> > bấm <strong>Add Key > Create new key > JSON</strong>. Một file <span class="code-pill">*.json</span> sẽ tự động được tải về máy tính của bạn.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           BƯỚC 2: TẢI LÊN FILE JSON KEY
+           ========================================== -->
+      <section class="step-panel" id="step-panel-2">
+        <div class="step-panel-title">
+          <i class="fa-solid fa-key" style="color: #F59E0B;"></i>
+          <span>Bước 2: Tải lên Khóa Service Account (JSON)</span>
+        </div>
+        <p class="step-panel-desc">
+          Kéo thả hoặc chọn file khóa bí mật <span class="code-pill">*.json</span> bạn vừa tải về từ Google Cloud Console ở Bước 1:
+        </p>
+
+        <!-- Dropzone -->
+        <div class="dropzone" id="key-dropzone">
+          <input type="file" id="file-key-input" accept=".json" style="display: none;">
+          <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+          <div class="dropzone-title">Kéo & Thả file Service Account JSON vào đây</div>
+          <div class="dropzone-subtitle">hoặc <strong style="color: var(--setup-primary);">bấm vào đây để chọn file từ máy tính</strong></div>
+        </div>
+
+        <!-- File Info Card -->
+        <div class="file-info-badge" id="file-info-badge">
+          <div class="file-info-text">
+            <i class="fa-solid fa-circle-check" style="font-size: 18px;"></i>
+            <div>
+              <div id="badge-file-name">service-account.json</div>
+              <div style="font-size: 11.5px; font-weight: normal; color: #047857;" id="badge-client-email">Email: -</div>
+            </div>
+          </div>
+          <button type="button" class="btn-setup btn-setup-secondary" id="btn-reselect-file" style="height: 32px; font-size: 12px; padding: 0 12px;">
+            <i class="fa-solid fa-arrows-rotate"></i> Chọn lại
+          </button>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           BƯỚC 3: LIÊN KẾT GOOGLE SPREADSHEET
+           ========================================== -->
+      <section class="step-panel" id="step-panel-3">
+        <div class="step-panel-title">
+          <i class="fa-solid fa-table-cells" style="color: #10B981;"></i>
+          <span>Bước 3: Liên kết Google Spreadsheet</span>
+        </div>
+        <p class="step-panel-desc">
+          Tạo 1 Google Sheet trắng trên Google Drive của bạn, sau đó chia sẻ quyền <strong>Người chỉnh sửa (Editor)</strong> cho email Service Account bên dưới:
+        </p>
+
+        <!-- Copy Service Account Email Box -->
+        <label class="form-label">Email Service Account cần cấp quyền Editor:</label>
+        <div class="copy-box">
+          <span class="copy-text" id="display-service-email">Đang chờ tải file JSON ở bước 2...</span>
+          <button type="button" class="btn-setup btn-setup-secondary" id="btn-copy-email" style="height: 32px; font-size: 12px; padding: 0 12px;">
+            <i class="fa-regular fa-copy"></i> <span>Sao chép</span>
+          </button>
+        </div>
+
+        <!-- Google Sheet URL / ID Input -->
+        <div class="form-group">
+          <label for="input-sheet-id" class="form-label">Link hoặc Spreadsheet ID Google Sheet của bạn:</label>
+          <div class="input-with-action">
+            <input type="text" id="input-sheet-id" class="form-input" placeholder="Ví dụ: https://docs.google.com/spreadsheets/d/1wTvAPblEWb.../edit hoặc ID">
+            <button type="button" class="btn-setup btn-setup-primary" id="btn-test-connection" style="white-space: nowrap;">
+              <i class="fa-solid fa-bolt"></i> Kiểm tra kết nối
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Connection Health Badge -->
+        <div class="connection-badge" id="connection-health-badge">
+          <i class="fa-solid fa-circle-notch fa-spin"></i>
+          <span id="connection-health-text">Đang kiểm tra kết nối...</span>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           BƯỚC 4: TÙY CHỌN DỮ LIỆU BAN ĐẦU
+           ========================================== -->
+      <section class="step-panel" id="step-panel-4">
+        <div class="step-panel-title">
+          <i class="fa-solid fa-database" style="color: #6366F1;"></i>
+          <span>Bước 4: Chọn Cấu hình Dữ liệu Ban Đầu</span>
+        </div>
+        <p class="step-panel-desc">
+          Hệ thống sẽ tự động khởi tạo 14 tab dữ liệu chuẩn theo mô hình dữ liệu doanh nghiệp. Hãy chọn chế độ bạn mong muốn:
+        </p>
+
+        <div class="choice-grid">
+          <!-- Choice 1: Sample Data -->
+          <div class="choice-card selected" id="choice-card-sample" onclick="appSetup.selectDataOption('SAMPLE')">
+            <input type="radio" name="data_option" value="SAMPLE" class="choice-radio" checked>
+            <div class="choice-icon"><i class="fa-solid fa-boxes-packing"></i></div>
+            <div class="choice-title">Bộ Dữ Liệu Doanh Nghiệp Mẫu</div>
+            <div class="choice-desc">
+              Tạo sẵn <strong>1,000 nhân sự</strong>, <strong>28 phòng ban</strong>, <strong>113 vị trí</strong>, hợp đồng và bảng lương chuẩn để bạn và khách hàng trải nghiệm ngay tất cả biểu đồ & tính năng.
+            </div>
+          </div>
+
+          <!-- Choice 2: Clean Database -->
+          <div class="choice-card" id="choice-card-clean" onclick="appSetup.selectDataOption('CLEAN')">
+            <input type="radio" name="data_option" value="CLEAN" class="choice-radio">
+            <div class="choice-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+            <div class="choice-title">Cơ Sở Dữ Liệu Trắng Tinh</div>
+            <div class="choice-desc">
+              Khởi tạo cấu trúc 14 tab chuẩn nhưng **không có dữ liệu mẫu** (chỉ có 1 tài khoản Super Admin) để công ty tự nhập mới nhân sự từ đầu.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           BƯỚC 5: TẠO TÀI KHOẢN SUPER ADMIN
+           ========================================== -->
+      <section class="step-panel" id="step-panel-5">
+        <div class="step-panel-title">
+          <i class="fa-solid fa-user-shield" style="color: #E52125;"></i>
+          <span>Bước 5: Tạo Tài Khoản Quản Trị Viên (Super Admin)</span>
+        </div>
+        <p class="step-panel-desc">
+          Thiết lập tài khoản cấp cao nhất để quản trị toàn bộ hệ thống HRM TRUNG HẢI:
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="admin-fullname">Họ và Tên Quản Trị Viên *</label>
+            <input type="text" id="admin-fullname" class="form-input" value="Huỳnh Thanh Long" placeholder="Nhập họ và tên">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-jobtitle">Chức danh / Vị trí *</label>
+            <input type="text" id="admin-jobtitle" class="form-input" value="Giám Đốc Quản Trị Hệ Thống" placeholder="Ví dụ: Giám Đốc Nhân Sự">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="admin-username">Tên đăng nhập (Username) *</label>
+            <input type="text" id="admin-username" class="form-input" value="admin" placeholder="Tên đăng nhập">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-password">Mật khẩu khởi tạo *</label>
+            <input type="password" id="admin-password" class="form-input" value="admin@123" placeholder="Nhập mật khẩu">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="admin-email">Email liên hệ</label>
+            <input type="email" id="admin-email" class="form-input" value="admin@trunghai.vn" placeholder="admin@domain.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="admin-phone">Số điện thoại</label>
+            <input type="tel" id="admin-phone" class="form-input" value="0901234567" placeholder="090xxxxxxx">
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           BƯỚC 6: HOÀN TẤT & KHỞI CHẠY (PROGRESS)
+           ========================================== -->
+      <section class="step-panel" id="step-panel-6">
+        <div style="text-align: center; padding: 20px 0;">
+          <div id="complete-loading-box">
+            <div style="font-size: 48px; color: var(--setup-primary); margin-bottom: 16px;">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+            </div>
+            <h2 style="font-size: 20px; color: var(--setup-navy-deep); margin-bottom: 8px;">Đang Thiết Lập & Đồng Bộ Google Sheets...</h2>
+            <p style="font-size: 13.5px; color: var(--setup-text-muted);" id="complete-loading-status">Đang khởi tạo 14 bảng dữ liệu và cấu hình tài khoản...</p>
+          </div>
+
+          <div id="complete-success-box" style="display: none;">
+            <div style="font-size: 54px; color: #059669; margin-bottom: 16px;">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h2 style="font-size: 22px; color: var(--setup-navy-deep); margin-bottom: 8px;">Khởi Tạo Hệ Thống Thành Công!</h2>
+            <p style="font-size: 14px; color: var(--setup-text-muted); max-width: 520px; margin: 0 auto 24px; line-height: 1.5;">
+              Cơ sở dữ liệu Google Sheets đã được đồng bộ hoàn tất. Tài khoản quản trị <strong>Super Admin</strong> của bạn đã sẵn sàng hoạt động.
+            </p>
+            <button type="button" class="btn-setup btn-setup-success" id="btn-enter-app" style="height: 46px; font-size: 15px; padding: 0 32px;">
+              <i class="fa-solid fa-door-open"></i> Vào Hệ Thống HRM TRUNG HẢI
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer Controls -->
+    <footer class="setup-footer" id="setup-footer">
+      <button type="button" class="btn-setup btn-setup-secondary" id="btn-prev-step" style="display: none;">
+        <i class="fa-solid fa-arrow-left"></i> Quay lại
+      </button>
+      <div style="margin-left: auto; display: flex; gap: 10px;">
+        <button type="button" class="btn-setup btn-setup-primary" id="btn-next-step">
+          Tiếp tục <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="setup-toast" id="setup-toast"></div>
+
+  <!-- Setup Client Script -->
+  <script src="js/setup.js"></script>
+</body>
+</html>

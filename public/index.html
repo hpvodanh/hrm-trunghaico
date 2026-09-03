@@ -1,0 +1,2332 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRUNG HẢI HRM - Hệ Thống Quản Trị Nhân Sự Doanh Nghiệp</title>
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS for client-side Excel export/import -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- Core App Stylesheet -->
+  <link rel="stylesheet" href="css/main.css">
+
+  <script>
+    // Kiểm tra phiên đăng nhập tức thì trước khi render để chống nháy màn hình Dashboard
+    if (localStorage.getItem('hrm_trunghai_user_session')) {
+      document.documentElement.classList.add('user-logged-in');
+    }
+  </script>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- ==========================================
+       1. LEFTBAR MENU (Sidebar Navigation)
+       ========================================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <a href="#" class="brand-wrapper">
+        <img src="assets/logo.png" alt="TRUNG HẢI Logo" class="brand-logo-img">
+        <div class="brand-info">
+          <span class="brand-title">TRUNG HẢI</span>
+          <span class="brand-subtitle">HRM ENTERPRISE</span>
+        </div>
+      </a>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-section-title">Tổng quan</div>
+      <button class="nav-item active" data-view="dashboard">
+        <i class="fa-solid fa-chart-pie"></i>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="nav-item" data-view="employees">
+        <i class="fa-solid fa-users"></i>
+        <span>Nhân sự</span>
+        <span class="badge-count" id="sidebar-emp-count">...</span>
+      </button>
+
+      <div class="nav-section-title">Tổ chức</div>
+      <button class="nav-item" data-view="departments">
+        <i class="fa-solid fa-building"></i>
+        <span>Phòng ban</span>
+        <span class="badge-count" id="sidebar-dept-count">...</span>
+      </button>
+
+      <button class="nav-item" data-view="positions">
+        <i class="fa-solid fa-briefcase"></i>
+        <span>Vị trí</span>
+        <span class="badge-count" id="sidebar-pos-count">...</span>
+      </button>
+
+      <div class="nav-section-title">Quản lý</div>
+      <button class="nav-item" data-view="contracts">
+        <i class="fa-solid fa-file-contract"></i>
+        <span>Hợp đồng</span>
+      </button>
+
+      <button class="nav-item" data-view="resigned">
+        <i class="fa-solid fa-user-xmark"></i>
+        <span>Nghỉ việc</span>
+        <span class="badge-count" id="sidebar-resigned-count">...</span>
+      </button>
+
+      <button class="nav-item" data-view="reports">
+        <i class="fa-solid fa-chart-line"></i>
+        <span>Báo cáo nhân sự</span>
+      </button>
+
+      <button class="nav-item" data-view="accounts">
+        <i class="fa-solid fa-user-shield"></i>
+        <span>Phân quyền</span>
+      </button>
+
+      <button class="nav-item" data-view="logs">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>Nhật ký</span>
+      </button>
+
+      <button class="nav-item" data-view="trash">
+        <i class="fa-solid fa-trash-can"></i>
+        <span>Thùng rác</span>
+        <span class="badge-count" id="sidebar-trash-count" style="display: none;">0</span>
+      </button>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="user-info">
+          <div class="user-name" id="sidebar-user-name">...</div>
+          <div class="user-role" id="sidebar-user-role">---</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ==========================================
+       2. MAIN CONTENT WRAPPER
+       ========================================== -->
+  <main class="main-wrapper">
+    <!-- Topbar Header -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn btn-icon btn-sm" id="sidebar-toggle-btn" title="Thu gọn / Mở rộng Menu" style="margin-right: 4px;">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <h1 class="page-heading" id="current-page-title">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Dashboard Thống Kê Nhân Sự</span>
+        </h1>
+      </div>
+
+      <div class="topbar-right">
+        <div class="topbar-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="global-search-input">
+        </div>
+
+        <button class="btn btn-accent btn-sm" id="btn-open-add-modal">
+          <i class="fa-solid fa-user-plus"></i>
+          <span>Thêm NV</span>
+        </button>
+
+        <button class="btn btn-secondary btn-sm" id="btn-quick-export">
+          <i class="fa-solid fa-file-excel" style="color: #10B981;"></i>
+          <span>Xuất Excel</span>
+        </button>
+
+        <button class="btn btn-secondary btn-sm" id="btn-company-settings" onclick="appCompany.openModal()" title="Cài đặt thông tin & Logo nhận diện thương hiệu công ty">
+          <i class="fa-solid fa-building" style="color: var(--primary-navy);"></i>
+          <span>Thương hiệu</span>
+        </button>
+
+        <button class="btn btn-secondary btn-sm" id="btn-open-sheets-modal" onclick="appSheets.openModal()" title="Cấu hình & Đồng bộ Google Sheets Cloud Database">
+          <i class="fa-solid fa-table-cells" style="color: #0F9D58;"></i>
+          <span>Google Sheet</span>
+        </button>
+
+        <!-- User Profile Badge & Logout -->
+        <div class="topbar-user-badge">
+          <span class="topbar-user-name" id="topbar-user-name">...</span>
+          <span class="badge badge-navy" id="topbar-user-role" style="font-size: 10px;">---</span>
+        </div>
+
+        <button class="btn btn-secondary btn-sm" id="btn-topbar-logout" title="Đăng xuất khỏi hệ thống">
+          <i class="fa-solid fa-right-from-bracket" style="color: var(--accent-red);"></i>
+          <span>Đăng xuất</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Content Views Container -->
+    <div class="content-body">
+      
+      <!-- ==========================================
+           VIEW 1: DASHBOARD
+           ========================================== -->
+      <section class="view-panel active" id="view-dashboard">
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Tổng Số Nhân Sự</span>
+              <span class="kpi-value" id="kpi-total-emp">--</span>
+              <span class="kpi-subtext positive"><i class="fa-solid fa-users"></i> Toàn bộ công ty</span>
+            </div>
+            <div class="kpi-icon-box"><i class="fa-solid fa-user-group"></i></div>
+          </div>
+
+          <div class="kpi-card accent-green">
+            <div class="kpi-info">
+              <span class="kpi-label">Đang Làm Việc</span>
+              <span class="kpi-value" id="kpi-active-emp">--</span>
+              <span class="kpi-subtext positive"><i class="fa-solid fa-circle-check"></i> Hoạt động</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #ECFDF5; color: #059669;"><i class="fa-solid fa-id-badge"></i></div>
+          </div>
+
+          <div class="kpi-card accent-amber">
+            <div class="kpi-info">
+              <span class="kpi-label">Thử Việc / Học Việc</span>
+              <span class="kpi-value" id="kpi-probation-emp">--</span>
+              <span class="kpi-subtext" style="color: #D97706;"><i class="fa-solid fa-clock"></i> Đang thử thách</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #FEF3C7; color: #D97706;"><i class="fa-solid fa-user-clock"></i></div>
+          </div>
+
+          <div class="kpi-card accent-red">
+            <div class="kpi-info">
+              <span class="kpi-label">Đơn Vị & Dự Án</span>
+              <span class="kpi-value" id="kpi-total-dept">--</span>
+              <span class="kpi-subtext" style="color: var(--accent-red);"><i class="fa-solid fa-building"></i> Cơ cấu trực thuộc</span>
+            </div>
+            <div class="kpi-icon-box"><i class="fa-solid fa-city"></i></div>
+          </div>
+        </div>
+
+        <!-- Row 1: Donut Charts (Cơ cấu phòng ban & Thống kê hợp đồng) -->
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header-styled">
+              <div class="chart-title-main">
+                <i class="fa-solid fa-chart-pie" style="color: var(--primary-navy);"></i>
+                <span>Cơ cấu nhân sự theo phòng ban</span>
+              </div>
+              <div class="chart-subtitle">Tất cả đơn vị - Cập nhật trực tiếp</div>
+            </div>
+            <div class="card-body">
+              <div class="donut-layout">
+                <div class="donut-chart-box">
+                  <canvas id="chart-dept-donut"></canvas>
+                  <div class="donut-center-total" id="donut-dept-total">--</div>
+                </div>
+                <div class="donut-legend-scroll" id="donut-dept-legend">
+                  <!-- Dynamic Legend Items -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header-styled">
+              <div class="chart-title-main">
+                <i class="fa-solid fa-file-contract" style="color: #2563EB;"></i>
+                <span>Thống kê hợp đồng theo loại</span>
+              </div>
+              <div class="chart-subtitle">Tất cả đơn vị - Cập nhật trực tiếp</div>
+            </div>
+            <div class="card-body">
+              <div class="donut-layout">
+                <div class="donut-chart-box">
+                  <canvas id="chart-contract-donut"></canvas>
+                  <div class="donut-center-total" id="donut-contract-total">--</div>
+                </div>
+                <div class="donut-legend-scroll" id="donut-contract-legend">
+                  <!-- Dynamic Legend Items -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Time-Series Charts (Biến động nhân sự & Số lượng nhân sự theo tháng) -->
+        <div class="charts-grid">
+          <div class="card">
+            <div class="card-header-styled">
+              <div class="chart-title-main">
+                <i class="fa-solid fa-chart-line" style="color: #0284C7;"></i>
+                <span>Biến động nhân sự</span>
+              </div>
+              <div class="chart-subtitle">Tất cả đơn vị - Năm 2026</div>
+            </div>
+            <div class="card-body">
+              <div class="chart-container">
+                <canvas id="chart-turnover-line"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header-styled">
+              <div class="chart-title-main">
+                <i class="fa-solid fa-chart-simple" style="color: #6366F1;"></i>
+                <span>Số lượng nhân sự</span>
+              </div>
+              <div class="chart-subtitle">Tất cả đơn vị - Năm 2026</div>
+            </div>
+            <div class="card-body">
+              <div class="chart-container">
+                <canvas id="chart-headcount-bar"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Alerts Table -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-bell" style="color: var(--accent-red);"></i>
+              <span>Cảnh Báo Thử Việc & Xem Xét Ký Hợp Đồng Mới</span>
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="table-responsive" style="border: none; max-height: 220px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã NV</th>
+                    <th>Họ Và Tên</th>
+                    <th>Vị Trí Công Việc</th>
+                    <th>Đơn Vị Công Tác</th>
+                    <th>Ngày Bắt Đầu Thử Việc</th>
+                    <th style="text-align: center;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-probation-tbody">
+                  <!-- Dynamic -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 2: EMPLOYEE DIRECTORY
+           ========================================== -->
+      <section class="view-panel" id="view-employees">
+        <div class="card">
+          <div class="card-body">
+            <!-- Filter Controls -->
+            <div class="table-controls">
+              <div class="search-filter-group">
+                <div style="position: relative; width: 260px;">
+                  <i class="fa-solid fa-search" style="position: absolute; left: 10px; top: 12px; color: var(--text-muted);"></i>
+                  <input type="text" id="emp-search-input" class="form-control" style="padding-left: 32px; width: 100%;" placeholder="Tìm theo tên, mã NV, SĐT, CCCD...">
+                </div>
+
+                <select id="emp-filter-dept" class="filter-select" style="max-width: 220px;">
+                  <option value="">-- Tất cả Đơn vị / Phòng ban --</option>
+                </select>
+
+                <select id="emp-filter-pos" class="filter-select" style="max-width: 200px;">
+                  <option value="">-- Tất cả Vị trí --</option>
+                </select>
+
+                <select id="emp-filter-status" class="filter-select">
+                  <option value="">-- Trạng thái làm việc --</option>
+                  <option value="Đang làm việc">Đang làm việc</option>
+                  <option value="Đã nghỉ việc">Đã nghỉ việc</option>
+                </select>
+
+                <select id="emp-filter-nature" class="filter-select">
+                  <option value="">-- Tính chất lao động --</option>
+                  <option value="Chính thức">Chính thức</option>
+                  <option value="Thử việc">Thử việc</option>
+                  <option value="Học việc">Học việc</option>
+                </select>
+
+                <button class="btn btn-secondary btn-sm" id="btn-reset-filters" title="Xóa bộ lọc">
+                  <i class="fa-solid fa-rotate-left"></i> Đặt lại
+                </button>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-outline-navy btn-sm" id="btn-open-import-emp" onclick="appImport.openModal()" title="Nhập danh sách nhân sự hàng loạt từ file Excel">
+                  <i class="fa-solid fa-file-import" style="color: var(--primary-navy);"></i> Nhập Excel
+                </button>
+                <button class="btn btn-excel btn-sm" id="btn-export-filtered-emp">
+                  <i class="fa-solid fa-file-excel"></i> Xuất Excel
+                </button>
+              </div>
+            </div>
+
+            <!-- Employee Data Table -->
+            <div class="table-responsive">
+              <table class="data-table" id="emp-main-table">
+                <thead>
+                  <tr>
+                    <th class="col-sticky-stt">STT</th>
+                    <th class="col-sticky-id">Mã NV</th>
+                    <th class="col-sticky-name">Họ và Tên</th>
+                    <th>Giới Tính</th>
+                    <th>Vị Trí Công Việc</th>
+                    <th>Đơn Vị Công Tác</th>
+                    <th>SĐT Di Động</th>
+                    <th>Email Công Việc</th>
+                    <th>Tính Chất</th>
+                    <th>Trạng Thái</th>
+                    <th class="col-sticky-action">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody id="employees-tbody">
+                  <!-- Injected via JavaScript -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-wrapper">
+              <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                <div id="pagination-info">Đang tải danh sách nhân sự...</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="emp-page-size" style="font-size: 12px; color: var(--text-secondary); margin: 0; white-space: nowrap;">Hiển thị:</label>
+                  <select id="emp-page-size" class="filter-select" style="height: 28px; padding: 2px 8px; font-size: 12px; border-radius: var(--radius-sm); width: auto; cursor: pointer;">
+                    <option value="25" selected>25 người / trang</option>
+                    <option value="50">50 người / trang</option>
+                    <option value="100">100 người / trang</option>
+                    <option value="200">200 người / trang</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pagination-controls" id="pagination-controls">
+                <!-- Page buttons injected dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 3: DEPARTMENTS
+           ========================================== -->
+      <section class="view-panel" id="view-departments">
+        <div class="card">
+          <div class="card-body">
+            <!-- Controls Filter Bar -->
+            <div class="table-controls" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div class="search-filter-group">
+                <input type="text" id="dept-search-input" class="form-control" placeholder="Tìm theo tên phòng ban, mã đơn vị..." style="width: 280px;">
+              </div>
+              <button class="btn btn-accent btn-sm" id="btn-open-add-dept" onclick="appOrganization.openAddDeptModal()">
+                <i class="fa-solid fa-plus"></i>
+                <span>Thêm Phòng Ban</span>
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã Đơn Vị</th>
+                    <th>Tên Đơn Vị Công Tác / Phòng Ban / Dự Án</th>
+                    <th style="text-align: center;">Số Lượng Nhân Sự</th>
+                    <th style="text-align: center;">Đang Làm Việc</th>
+                    <th>Trạng Thái</th>
+                    <th style="text-align: center;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="departments-tbody">
+                  <!-- Dynamic -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 4: POSITIONS
+           ========================================== -->
+      <section class="view-panel" id="view-positions">
+        <div class="card">
+          <div class="card-body">
+            <!-- Controls Filter Bar -->
+            <div class="table-controls" style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+              <div class="search-filter-group">
+                <input type="text" id="pos-search-input" class="form-control" placeholder="Tìm theo tên chức danh, mã vị trí..." style="width: 280px;">
+              </div>
+              <button class="btn btn-accent btn-sm" id="btn-open-add-pos" onclick="appOrganization.openAddPosModal()">
+                <i class="fa-solid fa-plus"></i>
+                <span>Thêm Vị Trí</span>
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã Vị Trí</th>
+                    <th>Tên Vị Trí Công Việc / Chức Danh</th>
+                    <th style="text-align: center;">Số Lượng Nhân Sự Đảm Nhiệm</th>
+                    <th>Trạng Thái</th>
+                    <th style="text-align: center;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="positions-tbody">
+                  <!-- Dynamic -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 5: CONTRACTS & ALERTS
+           ========================================== -->
+      <section class="view-panel" id="view-contracts">
+        <div class="card">
+          <div class="card-body">
+            <!-- Controls Filter Bar -->
+            <div class="table-controls">
+              <div class="search-filter-group">
+                <input type="text" id="contract-search-input" class="form-control" placeholder="Tìm theo mã HĐ, tên NV, mã NV, loại HĐ..." style="width: 320px;">
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã Hợp Đồng</th>
+                    <th>Mã NV</th>
+                    <th>Họ và Tên</th>
+                    <th>Loại Hợp Đồng</th>
+                    <th>Ngày Thử Việc</th>
+                    <th>Ngày Chính Thức</th>
+                    <th>Trạng Thái HĐ</th>
+                  </tr>
+                </thead>
+                <tbody id="contracts-tbody">
+                  <!-- Dynamic -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 6: RESIGNED EMPLOYEES (NGHỈ VIỆC)
+           ========================================== -->
+      <section class="view-panel" id="view-resigned">
+        <!-- KPI Summary Cards for Resigned -->
+        <div class="kpi-grid" style="margin-bottom: 16px;">
+          <div class="kpi-card accent-red">
+            <div class="kpi-info">
+              <span class="kpi-label">Tổng Nhân Sự Đã Nghỉ Việc</span>
+              <span class="kpi-value" id="kpi-resigned-total">20 người</span>
+              <span class="kpi-subtext" style="color: var(--accent-red);"><i class="fa-solid fa-user-xmark"></i> Hồ sơ đã chấm dứt HĐLĐ</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #FEE2E2; color: #DC2626;"><i class="fa-solid fa-user-slash"></i></div>
+          </div>
+
+          <div class="kpi-card accent-amber">
+            <div class="kpi-info">
+              <span class="kpi-label">Tỷ Lệ Biến Động Nghỉ Việc</span>
+              <span class="kpi-value" id="kpi-resigned-rate">2.0%</span>
+              <span class="kpi-subtext" style="color: #D97706;"><i class="fa-solid fa-arrow-trend-down"></i> Tỷ lệ nghỉ / Tổng nhân sự</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #FEF3C7; color: #D97706;"><i class="fa-solid fa-percent"></i></div>
+          </div>
+
+          <div class="kpi-card accent-green">
+            <div class="kpi-info">
+              <span class="kpi-label">Bàn Giao & Quyết Toán</span>
+              <span class="kpi-value" id="kpi-resigned-handover">20/20 (100%)</span>
+              <span class="kpi-subtext positive"><i class="fa-solid fa-clipboard-check"></i> Đã hoàn tất thủ tục nghỉ</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #ECFDF5; color: #059669;"><i class="fa-solid fa-check-double"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Đã Chốt & Trả Sổ BHXH</span>
+              <span class="kpi-value" id="kpi-resigned-bhxh">20 sổ</span>
+              <span class="kpi-subtext positive"><i class="fa-solid fa-shield-halved"></i> Đã báo giảm & chốt sổ</span>
+            </div>
+            <div class="kpi-icon-box" style="background: var(--primary-navy-soft); color: var(--primary-navy);"><i class="fa-solid fa-book-medical"></i></div>
+          </div>
+        </div>
+
+        <!-- Main Card & Data Table -->
+        <div class="card">
+          <div class="card-body">
+            <!-- Filter Bar -->
+            <div class="table-controls">
+              <div class="search-filter-group">
+                <input type="text" id="resigned-search-input" class="form-control" placeholder="Tìm theo tên, mã NV, SĐT, CCCD..." style="width: 260px;">
+                
+                <select id="resigned-filter-dept" class="filter-select" style="max-width: 240px;">
+                  <option value="">-- Tất cả Phòng Ban / Đơn vị --</option>
+                </select>
+
+                <select id="resigned-filter-pos" class="filter-select" style="max-width: 220px;">
+                  <option value="">-- Tất cả Vị Trí Công Việc --</option>
+                </select>
+
+                <button class="btn btn-secondary btn-sm" id="btn-reset-resigned-filters" title="Xóa bộ lọc">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span>Đặt lại</span>
+                </button>
+              </div>
+
+              <div>
+                <button class="btn btn-secondary btn-sm" id="btn-export-resigned-excel" style="background: #ECFDF5; color: #059669; border-color: #A7F3D0;">
+                  <i class="fa-solid fa-file-excel"></i>
+                  <span>Xuất Excel Nghỉ Việc</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Responsive -->
+            <div class="table-responsive">
+              <table class="data-table" id="resigned-main-table">
+                <thead>
+                  <tr>
+                    <th class="col-sticky-stt">STT</th>
+                    <th class="col-sticky-id">Mã NV</th>
+                    <th class="col-sticky-name">Họ và Tên</th>
+                    <th>Giới Tính</th>
+                    <th>Đơn Vị Công Tác Trước Khi Nghỉ</th>
+                    <th>Vị Trí Công Việc</th>
+                    <th>Ngày Vào Làm</th>
+                    <th>Ngày Nghỉ Việc</th>
+                    <th>Thâm Niên Làm Việc</th>
+                    <th>Trạng Thái</th>
+                    <th class="col-sticky-action" style="text-align: center;">Hành Động</th>
+                  </tr>
+                </thead>
+                <tbody id="resigned-tbody">
+                  <!-- Injected dynamically via JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-wrapper">
+              <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                <div id="resigned-pagination-info">Hiển thị 1 - 20 của 20 nhân sự đã nghỉ việc</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="resigned-page-size" style="font-size: 12px; color: var(--text-secondary); margin: 0; white-space: nowrap;">Hiển thị:</label>
+                  <select id="resigned-page-size" class="filter-select" style="height: 28px; padding: 2px 8px; font-size: 12px; border-radius: var(--radius-sm); width: auto; cursor: pointer;">
+                    <option value="25" selected>25 người / trang</option>
+                    <option value="50">50 người / trang</option>
+                    <option value="100">100 người / trang</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pagination-controls" id="resigned-pagination-controls">
+                <!-- Dynamic Page Buttons -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 7: WORKFORCE DYNAMICS & HEADCOUNT REPORT
+           ========================================== -->
+      <section class="view-panel" id="view-reports">
+        <!-- KPI Summary Cards for Reports -->
+        <div class="kpi-grid" style="margin-bottom: 16px;">
+          <div class="kpi-card accent-blue">
+            <div class="kpi-info">
+              <span class="kpi-label">Tổng Quy Mô Nhân Sự</span>
+              <span class="kpi-value" id="kpi-report-total">--</span>
+              <span class="kpi-subtext"><i class="fa-solid fa-users"></i> Đang làm việc trong hệ thống</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #EFF6FF; color: #2563EB;"><i class="fa-solid fa-user-group"></i></div>
+          </div>
+
+          <div class="kpi-card accent-green">
+            <div class="kpi-info">
+              <span class="kpi-label">Tuyển Mới Trong Kỳ Lọc</span>
+              <span class="kpi-value" id="kpi-report-new" style="color: #059669;">0</span>
+              <span class="kpi-subtext positive" id="kpi-report-new-sub"><i class="fa-solid fa-user-plus"></i> Nhân sự mới gia nhập</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #ECFDF5; color: #059669;"><i class="fa-solid fa-user-plus"></i></div>
+          </div>
+
+          <div class="kpi-card accent-red">
+            <div class="kpi-info">
+              <span class="kpi-label">Nghỉ Việc Trong Kỳ Lọc</span>
+              <span class="kpi-value" id="kpi-report-resigned" style="color: var(--accent-red);">0</span>
+              <span class="kpi-subtext" style="color: var(--accent-red);" id="kpi-report-resigned-sub"><i class="fa-solid fa-user-xmark"></i> Chấm dứt hợp đồng</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #FEE2E2; color: #DC2626;"><i class="fa-solid fa-user-slash"></i></div>
+          </div>
+
+          <div class="kpi-card accent-amber">
+            <div class="kpi-info">
+              <span class="kpi-label">Tăng Trưởng Ròng / Tỷ Lệ</span>
+              <span class="kpi-value" id="kpi-report-net">0</span>
+              <span class="kpi-subtext" id="kpi-report-rate" style="color: #D97706;"><i class="fa-solid fa-chart-line"></i> Biến động: 0%</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #FEF3C7; color: #D97706;"><i class="fa-solid fa-arrow-trend-up"></i></div>
+          </div>
+        </div>
+
+        <!-- Filter & Control Toolbar Card -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div class="card-body" style="padding: 14px 18px;">
+            <div class="table-controls" style="margin-bottom: 0;">
+              <div class="search-filter-group" style="flex-wrap: wrap; gap: 8px;">
+                <!-- Preset Period Select -->
+                <select id="report-filter-period" class="filter-select" style="min-width: 170px; font-weight: 600; color: var(--primary-navy);">
+                  <option value="all">📅 Tất cả thời gian</option>
+                  <option value="this_month">📅 Tháng này</option>
+                  <option value="last_month">📅 Tháng trước</option>
+                  <option value="this_quarter">📅 Quý này</option>
+                  <option value="this_year" selected>📅 Năm nay (2026)</option>
+                  <option value="last_year">📅 Năm trước (2025)</option>
+                  <option value="custom">📅 Tùy chỉnh khoảng ngày</option>
+                </select>
+
+                <!-- Custom Date Range Inputs -->
+                <div id="report-custom-date-group" style="display: none; align-items: center; gap: 6px;">
+                  <input type="date" id="report-date-from" class="form-control" style="height: 32px; font-size: 12px; width: 135px;" title="Từ ngày">
+                  <span style="font-size: 12px; color: var(--text-secondary);">-</span>
+                  <input type="date" id="report-date-to" class="form-control" style="height: 32px; font-size: 12px; width: 135px;" title="Đến ngày">
+                </div>
+
+                <!-- Department Filter -->
+                <select id="report-filter-dept" class="filter-select" style="max-width: 220px;">
+                  <option value="">-- Tất cả Phòng Ban --</option>
+                </select>
+
+                <!-- Movement Type Filter -->
+                <select id="report-filter-type" class="filter-select" style="max-width: 190px;">
+                  <option value="ALL">🔄 Tất cả biến động</option>
+                  <option value="NEW">➕ Tuyển mới (New Hires)</option>
+                  <option value="RESIGNED">➖ Nghỉ việc (Turnover)</option>
+                </select>
+
+                <!-- Search box -->
+                <input type="text" id="report-search-input" class="form-control" placeholder="Tìm theo tên, mã NV, vị trí..." style="width: 220px;">
+
+                <button class="btn btn-secondary btn-sm" id="btn-reset-report-filters" title="Đặt lại bộ lọc">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span>Đặt lại</span>
+                </button>
+              </div>
+
+              <div>
+                <button class="btn btn-secondary btn-sm" id="btn-export-report-excel" style="background: #ECFDF5; color: #059669; border-color: #A7F3D0; font-weight: 600;">
+                  <i class="fa-solid fa-file-excel"></i>
+                  <span>Xuất Báo Cáo Excel</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row (Visual Analytics) -->
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <!-- Monthly Trend Chart -->
+          <div class="card">
+            <div class="card-header" style="padding: 12px 18px;">
+              <div class="card-title" style="font-size: 13.5px;">
+                <i class="fa-solid fa-chart-column" style="color: var(--primary-navy);"></i>
+                <span>Xu Hướng Biến Động Nhân Sự Theo Tháng (Tuyển Mới vs Nghỉ Việc)</span>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 16px; height: 260px; position: relative;">
+              <canvas id="report-monthly-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Department Distribution Chart -->
+          <div class="card">
+            <div class="card-header" style="padding: 12px 18px;">
+              <div class="card-title" style="font-size: 13.5px;">
+                <i class="fa-solid fa-chart-pie" style="color: #6366F1;"></i>
+                <span>Biến Động Theo Khối / Phòng Ban</span>
+              </div>
+            </div>
+            <div class="card-body" style="padding: 16px; height: 260px; position: relative;">
+              <canvas id="report-dept-chart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Data Table: Detailed Fluctuations List -->
+        <div class="card">
+          <div class="card-header" style="padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;">
+            <div class="card-title" style="font-size: 13.5px;">
+              <i class="fa-solid fa-list-check"></i>
+              <span>Danh Sách Nhân Sự Biến Động Chi Tiết Trong Kỳ Lọc</span>
+            </div>
+            <div id="report-table-summary-badge" class="badge badge-navy" style="font-size: 11.5px;">
+              0 bản ghi
+            </div>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div class="table-responsive">
+              <table class="data-table" id="report-main-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px; text-align: center;">STT</th>
+                    <th style="width: 100px;">Mã NV</th>
+                    <th style="width: 180px;">Họ Và Tên</th>
+                    <th style="width: 90px;">Giới Tính</th>
+                    <th>Phòng Ban / Đơn Vị</th>
+                    <th>Vị Trí Công Việc</th>
+                    <th style="width: 140px; text-align: center;">Loại Biến Động</th>
+                    <th style="width: 120px;">Ngày Hiệu Lực</th>
+                    <th style="width: 130px;">Trạng Thái HĐ</th>
+                    <th style="width: 80px; text-align: center;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="report-tbody">
+                  <!-- Dynamic Rows via reports.js -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-wrapper" style="padding: 12px 18px;">
+              <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                <div id="report-pagination-info" style="font-size: 12px; color: var(--text-secondary);">Hiển thị 0 - 0 của 0 nhân sự</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="report-page-size" style="font-size: 12px; color: var(--text-secondary); margin: 0; white-space: nowrap;">Hiển thị:</label>
+                  <select id="report-page-size" class="filter-select" style="height: 28px; padding: 2px 8px; font-size: 12px; width: auto; cursor: pointer;">
+                    <option value="20" selected>20 người / trang</option>
+                    <option value="50">50 người / trang</option>
+                    <option value="100">100 người / trang</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pagination-controls" id="report-pagination-controls">
+                <!-- Dynamic Page Buttons -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 8: SYSTEM ACCOUNTS & RBAC
+           ========================================== -->
+      <section class="view-panel" id="view-accounts">
+        <div class="card">
+          <div class="card-body">
+            <!-- Controls Filter Bar -->
+            <div class="table-controls">
+              <div class="search-filter-group">
+                <input type="text" id="acc-search-input" class="form-control" placeholder="Tìm theo tên, mã NV, email..." style="width: 260px;">
+                <select id="acc-filter-role" class="filter-select">
+                  <option value="">-- Tất cả phân quyền (Role) --</option>
+                  <option value="ADMIN">👑 Admin (Toàn quyền)</option>
+                  <option value="USER">👤 User (Người dùng)</option>
+                </select>
+                <select id="acc-filter-status" class="filter-select">
+                  <option value="">-- Tất cả trạng thái --</option>
+                  <option value="Kích hoạt">Hoạt động</option>
+                  <option value="Đã khóa">Đã khóa</option>
+                </select>
+              </div>
+
+              <div>
+                <button class="btn btn-accent btn-sm" id="btn-open-add-account">
+                  <i class="fa-solid fa-user-plus"></i>
+                  <span>Cấp Tài Khoản Mới</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Accounts Data Table -->
+            <div class="table-responsive" style="max-height: calc(100vh - 240px);">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Mã Tài Khoản</th>
+                    <th>Mã Nhân Viên</th>
+                    <th>Họ Và Tên</th>
+                    <th>Email Đăng Nhập</th>
+                    <th>Phân Quyền (Role)</th>
+                    <th>Mật Khẩu</th>
+                    <th>Trạng Thái</th>
+                    <th style="text-align: center;">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="accounts-tbody">
+                  <!-- Dynamic Rendered -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination-wrapper" id="accounts-pagination"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW 9: SYSTEM ACTIVITY LOGS
+           ========================================== -->
+      <section class="view-panel" id="view-logs">
+        <div class="card">
+          <div class="card-body">
+            <!-- Controls Filter Bar -->
+            <div class="table-controls">
+              <div class="search-filter-group" style="flex-wrap: wrap; gap: 8px;">
+                <input type="text" id="logs-search-input" class="form-control" placeholder="Tìm theo người thực hiện, nội dung, mã NV..." style="width: 280px;">
+                
+                <select id="logs-filter-action" class="filter-select">
+                  <option value="">-- Tất cả hành động --</option>
+                  <option value="CREATE">➕ Thêm mới (Create)</option>
+                  <option value="UPDATE">✏️ Chỉnh sửa (Update)</option>
+                  <option value="DELETE">🗑️ Xóa dữ liệu (Delete)</option>
+                  <option value="LOGIN">🔑 Đăng nhập (Login)</option>
+                  <option value="LOGIN_FAIL">⚠️ Đăng nhập sai</option>
+                  <option value="LOGOUT">🚪 Đăng xuất (Logout)</option>
+                  <option value="PASSWORD">🔐 Đổi / Reset mật khẩu</option>
+                  <option value="EXPORT">📊 Xuất Excel</option>
+                </select>
+
+                <select id="logs-filter-module" class="filter-select">
+                  <option value="">-- Tất cả phân hệ --</option>
+                  <option value="Nhân sự">Nhân sự</option>
+                  <option value="Tài khoản">Tài khoản & Phân quyền</option>
+                  <option value="Bảo mật">Bảo mật & Đăng nhập</option>
+                  <option value="Báo cáo">Báo cáo</option>
+                  <option value="Hệ thống">Hệ thống</option>
+                </select>
+
+                <select id="logs-filter-date" class="filter-select">
+                  <option value="">-- Tất cả thời gian --</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="7days">7 ngày gần nhất</option>
+                  <option value="30days">30 ngày gần nhất</option>
+                </select>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" id="btn-refresh-logs" title="Làm mới nhật ký">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Làm Mới</span>
+                </button>
+                <button class="btn btn-outline-navy btn-sm" id="btn-export-logs" title="Xuất lịch sử nhật ký ra file Excel">
+                  <i class="fa-solid fa-file-excel"></i>
+                  <span>Xuất Excel</span>
+                </button>
+                <button class="btn btn-secondary btn-sm" id="btn-clear-logs" style="color: var(--accent-red);" title="Làm trống nhật ký">
+                  <i class="fa-solid fa-trash-can"></i>
+                  <span>Xóa Lịch Sử</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Activity Logs Table -->
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 150px;">Thời Gian</th>
+                    <th style="width: 200px;">Người Thực Hiện</th>
+                    <th style="width: 100px;">Vai Trò</th>
+                    <th style="width: 120px;">Phân Hệ</th>
+                    <th style="width: 130px;">Hành Động</th>
+                    <th>Nội Dung Chi Tiết Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody id="logs-tbody">
+                  <!-- Dynamic Logs -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="table-pagination" id="logs-pagination">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==========================================
+           VIEW: RECYCLE BIN (THÙNG RÁC)
+           ========================================== -->
+      <section class="view-panel" id="view-trash">
+        <!-- KPI Cards for Trash -->
+        <div class="kpi-grid">
+          <div class="kpi-card accent-red">
+            <div class="kpi-info">
+              <span class="kpi-label">Nhân Sự Trong Thùng Rác</span>
+              <span class="kpi-value" id="kpi-trash-total" style="color: var(--accent-red);">0</span>
+              <span class="kpi-subtext" style="color: var(--accent-red);"><i class="fa-solid fa-trash-can"></i> Chờ khôi phục hoặc xóa</span>
+            </div>
+            <div class="kpi-icon-box" style="background: var(--accent-red-soft); color: var(--accent-red);"><i class="fa-solid fa-trash-can"></i></div>
+          </div>
+
+          <div class="kpi-card accent-amber">
+            <div class="kpi-info">
+              <span class="kpi-label">Đã Xóa 7 Ngày Qua</span>
+              <span class="kpi-value" id="kpi-trash-recent">0</span>
+              <span class="kpi-subtext" style="color: #D97706;"><i class="fa-regular fa-clock"></i> Mới xóa gần đây</span>
+            </div>
+            <div class="kpi-icon-box" style="background: #FEF3C7; color: #D97706;"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-info">
+              <span class="kpi-label">Phòng Ban / Khối Nhiều Nhất</span>
+              <span class="kpi-value" id="kpi-trash-top-dept" style="font-size: 14.5px;">-</span>
+              <span class="kpi-subtext"><i class="fa-solid fa-building"></i> Theo đơn vị công tác</span>
+            </div>
+            <div class="kpi-icon-box"><i class="fa-solid fa-building-user"></i></div>
+          </div>
+        </div>
+
+        <!-- Filter and Bulk Actions Bar -->
+        <div class="card">
+          <div class="card-body">
+            <div class="table-controls">
+              <div class="search-filter-group">
+                <div style="position: relative; width: 280px;">
+                  <i class="fa-solid fa-search" style="position: absolute; left: 10px; top: 12px; color: var(--text-muted);"></i>
+                  <input type="text" id="trash-search-input" class="form-control" style="padding-left: 32px; width: 100%;" placeholder="Tìm theo tên, mã NV, phòng ban, email, SĐT...">
+                </div>
+
+                <select id="trash-filter-dept" class="filter-select" style="max-width: 240px;">
+                  <option value="">-- Tất cả Phòng Ban / Đơn vị --</option>
+                </select>
+
+                <button class="btn btn-secondary btn-sm" id="btn-reset-trash-filters" title="Xóa bộ lọc">
+                  <i class="fa-solid fa-rotate-left"></i>
+                  <span>Đặt lại</span>
+                </button>
+              </div>
+
+              <!-- Action Buttons -->
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <div id="trash-bulk-actions-bar" style="display: none; align-items: center; gap: 8px; background: var(--bg-subtle); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                  <span style="font-size: 12px; font-weight: 600; color: var(--primary-navy);">Đã chọn: <strong id="trash-selected-count">0</strong></span>
+                  <button class="btn btn-sm btn-secondary" id="btn-trash-bulk-restore" style="color: #059669; border-color: #A7F3D0; background: #ECFDF5; height: 28px; padding: 0 10px;">
+                    <i class="fa-solid fa-rotate-left"></i> Khôi phục đã chọn
+                  </button>
+                  <button class="btn btn-sm btn-accent" id="btn-trash-bulk-purge" style="height: 28px; padding: 0 10px;">
+                    <i class="fa-solid fa-trash-can"></i> Xóa vĩnh viễn
+                  </button>
+                </div>
+
+                <button class="btn btn-secondary btn-sm" id="btn-trash-empty-all" style="color: var(--accent-red); border-color: #FECACA; background: #FEF2F2;" title="Dọn sạch toàn bộ thùng rác">
+                  <i class="fa-solid fa-trash-can"></i>
+                  <span>Dọn Sạch Thùng Rác</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Trash Data Table -->
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width: 36px; text-align: center;">
+                      <input type="checkbox" id="trash-select-all" title="Chọn tất cả trang này">
+                    </th>
+                    <th style="width: 100px;">Mã NV</th>
+                    <th style="width: 220px;">Họ và Tên / Liên hệ</th>
+                    <th style="width: 90px;">Giới tính</th>
+                    <th style="width: 220px;">Đơn vị / Vị trí</th>
+                    <th style="width: 130px;">Ngày xóa</th>
+                    <th style="width: 140px;">Người xóa</th>
+                    <th class="col-sticky-action" style="width: 160px; text-align: center;">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="trash-table-body">
+                  <!-- Rendered via JS -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-wrapper">
+              <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                <div id="trash-pagination-info">Hiển thị 0 - 0 của 0 nhân sự trong thùng rác</div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <label for="trash-page-size" style="font-size: 12px; color: var(--text-secondary); margin: 0; white-space: nowrap;">Hiển thị:</label>
+                  <select id="trash-page-size" class="filter-select" style="height: 28px; padding: 2px 8px; font-size: 12px; border-radius: var(--radius-sm); width: auto; cursor: pointer;">
+                    <option value="25">25 dòng</option>
+                    <option value="50">50 dòng</option>
+                    <option value="100">100 dòng</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pagination-pages" id="trash-pagination-pages">
+                <!-- Dynamic page buttons -->
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<!-- ==========================================================================
+     MODAL 1: EMPLOYEE DETAIL DRAWER (8 Detailed Tabs)
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-employee-detail">
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="modal-title">
+        <i class="fa-solid fa-id-card"></i>
+        <span id="detail-modal-emp-name">Chi Tiết Hồ Sơ Nhân Viên</span>
+      </div>
+      <button class="modal-close" onclick="appEmployees.closeDetailModal()">&times;</button>
+    </div>
+
+    <!-- 8 Tabs Navigation -->
+    <div class="modal-tabs">
+      <button class="modal-tab-btn active" data-tab="tab-general">1. Hành Chính & Quản Lý</button>
+      <button class="modal-tab-btn" data-tab="tab-contact">2. Liên Hệ & Cư Trú</button>
+      <button class="modal-tab-btn" data-tab="tab-identity">3. Giấy Tờ & CCCD</button>
+      <button class="modal-tab-btn" data-tab="tab-emergency">4. Thân Nhân Khẩn Cấp</button>
+      <button class="modal-tab-btn" data-tab="tab-education">5. Học Vấn & Đào Tạo</button>
+      <button class="modal-tab-btn" data-tab="tab-salary">6. Lương & Ngân Hàng</button>
+      <button class="modal-tab-btn" data-tab="tab-insurance">7. Bảo Hiểm & Công Đoàn</button>
+      <button class="modal-tab-btn" data-tab="tab-contract">8. Hợp Đồng & Tài Khoản</button>
+    </div>
+
+    <div class="modal-body" id="detail-modal-body">
+      <!-- Tab 1: General Info -->
+      <div class="tab-pane active" id="tab-general">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">Mã Nhân Viên</span><span class="info-value" id="det-emp-id">-</span></div>
+          <div class="info-item"><span class="info-label">Mã Chấm Công</span><span class="info-value" id="det-time-code">-</span></div>
+          <div class="info-item"><span class="info-label">Họ và Tên</span><span class="info-value" id="det-full-name">-</span></div>
+          <div class="info-item"><span class="info-label">Giới Tính</span><span class="info-value" id="det-gender">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Sinh</span><span class="info-value" id="det-dob">-</span></div>
+          <div class="info-item"><span class="info-label">Nơi Sinh</span><span class="info-value" id="det-birth-place">-</span></div>
+          <div class="info-item"><span class="info-label">Nguyên Quán</span><span class="info-value" id="det-native-place">-</span></div>
+          <div class="info-item"><span class="info-label">Dân Tộc / Tôn Giáo</span><span class="info-value" id="det-ethnicity-rel">-</span></div>
+          <div class="info-item"><span class="info-label">Hôn Nhân & Số Con</span><span class="info-value" id="det-marital-children">-</span></div>
+          <div class="info-item"><span class="info-label">Đơn Vị Công Tác</span><span class="info-value" id="det-dept-name">-</span></div>
+          <div class="info-item"><span class="info-label">Vị Trí Công Việc</span><span class="info-value" id="det-pos-name">-</span></div>
+          <div class="info-item"><span class="info-label">Cấp Bậc Nhân Sự</span><span class="info-value" id="det-job-rank" style="color: var(--primary-navy); font-weight: 600;">-</span></div>
+          <div class="info-item"><span class="info-label">Chức Danh Chuyên Môn</span><span class="info-value" id="det-job-title">-</span></div>
+          <div class="info-item"><span class="info-label">Địa Điểm Làm Việc</span><span class="info-value" id="det-work-loc">-</span></div>
+          <div class="info-item"><span class="info-label">Quản Lý Trực Tiếp</span><span class="info-value" id="det-direct-mgr">-</span></div>
+          <div class="info-item"><span class="info-label">Quản Lý Gián Tiếp</span><span class="info-value" id="det-indirect-mgr">-</span></div>
+          <div class="info-item"><span class="info-label">Tính Chất Lao Động</span><span class="info-value" id="det-labor-nature">-</span></div>
+          <div class="info-item"><span class="info-label">Trạng Thái Làm Việc</span><span class="info-value" id="det-emp-status">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Bắt Đầu Làm Việc</span><span class="info-value" id="det-start-date">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Kết Thúc (HĐ/Nghỉ)</span><span class="info-value" id="det-end-date">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Thử Việc / Chính Thức</span><span class="info-value" id="det-official-date">-</span></div>
+          <div class="info-item"><span class="info-label">Thâm Niên Công Tác</span><span class="info-value" id="det-seniority">-</span></div>
+          <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label">Bằng Cấp Chuyên Môn Khác & Chứng Chỉ</span><span class="info-value" id="det-other-certs" style="color: #059669; font-weight: 500;">-</span></div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Contact Info -->
+      <div class="tab-pane" id="tab-contact">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">ĐT Di Động</span><span class="info-value" id="det-mobile">-</span></div>
+          <div class="info-item"><span class="info-label">ĐT Nhà Riêng</span><span class="info-value" id="det-home-phone">-</span></div>
+          <div class="info-item"><span class="info-label">Email Công Việc</span><span class="info-value" id="det-work-email">-</span></div>
+          <div class="info-item"><span class="info-label">Email Cá Nhân</span><span class="info-value" id="det-personal-email">-</span></div>
+          <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label">Hộ Khẩu Thường Trú</span><span class="info-value" id="det-perm-addr">-</span></div>
+          <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label">Chỗ Ở Hiện Nay</span><span class="info-value" id="det-curr-addr">-</span></div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Identity Docs -->
+      <div class="tab-pane" id="tab-identity">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">Loại Giấy Tờ</span><span class="info-value" id="det-id-type">CCCD</span></div>
+          <div class="info-item"><span class="info-label">Số CMND / CCCD (12 số)</span><span class="info-value" id="det-id-num">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Cấp</span><span class="info-value" id="det-id-date">-</span></div>
+          <div class="info-item"><span class="info-label">Nơi Cấp</span><span class="info-value" id="det-id-place">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Hết Hạn CCCD</span><span class="info-value" id="det-id-exp">-</span></div>
+          <div class="info-item"><span class="info-label">Mã Số Thuế Cá Nhân</span><span class="info-value" id="det-tax-code">-</span></div>
+          <div class="info-item"><span class="info-label">Số Hộ Chiếu</span><span class="info-value" id="det-passport-num">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Cấp Hộ Chiếu</span><span class="info-value" id="det-passport-date">-</span></div>
+        </div>
+      </div>
+
+      <!-- Tab 4: Emergency Contact -->
+      <div class="tab-pane" id="tab-emergency">
+        <div class="info-grid" id="det-emergency-container">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Tab 5: Education -->
+      <div class="tab-pane" id="tab-education">
+        <div class="info-grid" id="det-education-container">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Tab 6: Salary & Bank -->
+      <div class="tab-pane" id="tab-salary">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">Bậc Lương</span><span class="info-value" id="det-salary-grade">-</span></div>
+          <div class="info-item"><span class="info-label">Lương Cơ Bản</span><span class="info-value" id="det-base-salary" style="color: #059669;">-</span></div>
+          <div class="info-item"><span class="info-label">Tổng Lương</span><span class="info-value" id="det-total-salary">-</span></div>
+          <div class="info-item"><span class="info-label">Lương Đóng Bảo Hiểm</span><span class="info-value" id="det-ins-salary">-</span></div>
+          <div class="info-item"><span class="info-label">Số Tài Khoản Ngân Hàng</span><span class="info-value" id="det-bank-acc">-</span></div>
+          <div class="info-item"><span class="info-label">Ngân Hàng Mở Thẻ</span><span class="info-value" id="det-bank-name">-</span></div>
+          <div class="info-item"><span class="info-label">Chi Nhánh Ngân Hàng</span><span class="info-value" id="det-bank-branch">-</span></div>
+        </div>
+      </div>
+
+      <!-- Tab 7: Insurance & Welfare -->
+      <div class="tab-pane" id="tab-insurance">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">Tham Gia Bảo Hiểm</span><span class="info-value" id="det-has-ins">-</span></div>
+          <div class="info-item"><span class="info-label">Mã Số BHXH</span><span class="info-value" id="det-bhxh-code">-</span></div>
+          <div class="info-item"><span class="info-label">Số Sổ BHXH</span><span class="info-value" id="det-bhxh-book">-</span></div>
+          <div class="info-item"><span class="info-label">Ngày Bắt Đầu Đóng BH</span><span class="info-value" id="det-ins-date">-</span></div>
+          <div class="info-item"><span class="info-label">Tỷ Lệ Đóng (BHXH 8%, BHYT 1.5%, BHTN 1%)</span><span class="info-value" id="det-ins-rate">10.5%</span></div>
+          <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label">Nơi Đăng Ký Khám Chữa Bệnh Ban Đầu</span><span class="info-value" id="det-hospital">-</span></div>
+          <div class="info-item"><span class="info-label">Đoàn Viên Công Đoàn</span><span class="info-value" id="det-union">-</span></div>
+        </div>
+      </div>
+
+      <!-- Tab 8: Contract & Account -->
+      <div class="tab-pane" id="tab-contract">
+        <div class="info-grid">
+          <div class="info-item"><span class="info-label">Mã Hợp Đồng</span><span class="info-value" id="det-contract-id">-</span></div>
+          <div class="info-item"><span class="info-label">Loại Hợp Đồng</span><span class="info-value" id="det-contract-type">-</span></div>
+          <div class="info-item"><span class="info-label">Trạng Thái Hợp Đồng</span><span class="info-value" id="det-contract-status">-</span></div>
+          <div class="info-item"><span class="info-label">Email Đăng Nhập WebApp</span><span class="info-value" id="det-acc-email">-</span></div>
+          <div class="info-item"><span class="info-label">Phân Quyền Hệ Thống</span><span class="info-value" id="det-acc-role">-</span></div>
+          <div class="info-item"><span class="info-label">Trạng Thái Tài Khoản</span><span class="info-value" id="det-acc-status">-</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="window.print()"><i class="fa-solid fa-print"></i> In Hồ Sơ</button>
+      <button class="btn btn-primary" id="btn-edit-from-detail"><i class="fa-solid fa-pen-to-square"></i> Chỉnh Sửa</button>
+      <button class="btn btn-secondary" onclick="appEmployees.closeDetailModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL 2: ADD / EDIT EMPLOYEE FORM (FULL 34 FIELDS)
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-employee-form">
+  <div class="modal-container" style="max-width: 920px; max-height: 90vh; display: flex; flex-direction: column;">
+    <div class="modal-header">
+      <div class="modal-title">
+        <i class="fa-solid fa-user-pen" id="form-modal-icon"></i>
+        <span id="form-modal-title">Chỉnh Sửa Hồ Sơ Nhân Viên</span>
+      </div>
+      <button class="modal-close" onclick="appEmployees.closeFormModal()">&times;</button>
+    </div>
+
+    <!-- 4 Navigation Tabs for Form -->
+    <div class="modal-tabs" style="border-bottom: 1px solid var(--border-color); background: #F8FAFC;">
+      <button type="button" class="modal-tab-btn form-tab-btn active" data-tab="form-tab-personal"><i class="fa-solid fa-user"></i> 1. Cá Nhân & Thân Nhân</button>
+      <button type="button" class="modal-tab-btn form-tab-btn" data-tab="form-tab-job"><i class="fa-solid fa-briefcase"></i> 2. Vị Trí, Cấp Bậc & HĐ</button>
+      <button type="button" class="modal-tab-btn form-tab-btn" data-tab="form-tab-contact"><i class="fa-solid fa-address-book"></i> 3. Cư Trú, CCCD & Khẩn Cấp</button>
+      <button type="button" class="modal-tab-btn form-tab-btn" data-tab="form-tab-salary-edu"><i class="fa-solid fa-wallet"></i> 4. Lương, BHXH & Học Vấn</button>
+    </div>
+
+    <form id="employee-crud-form" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+      <input type="hidden" id="form-is-edit" value="0">
+      
+      <div class="modal-body" style="overflow-y: auto; padding: 18px 24px; flex: 1;">
+        
+        <!-- TAB 1: CÁ NHÂN & THÂN NHÂN -->
+        <div class="form-tab-pane active" id="form-tab-personal">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Mã Nhân Viên <span class="req">*</span></label>
+              <input type="text" id="form-emp-id" class="form-control" placeholder="Tự động sinh (TH-xxxx)" required>
+            </div>
+
+            <div class="form-group">
+              <label>Họ và Tên Đầy Đủ <span class="req">*</span></label>
+              <input type="text" id="form-full-name" class="form-control" placeholder="Nguyễn Văn A" required>
+            </div>
+
+            <div class="form-group">
+              <label>Giới Tính</label>
+              <select id="form-gender" class="form-control">
+                <option value="Nam">Nam</option>
+                <option value="Nữ">Nữ</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Ngày Tháng Năm Sinh</label>
+              <input type="date" id="form-dob" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Nơi Sinh (Tỉnh/Thành phố)</label>
+              <input type="text" id="form-birth-place" class="form-control" placeholder="Hà Nội, TP.HCM, Phú Yên...">
+            </div>
+
+            <div class="form-group">
+              <label>Nguyên Quán</label>
+              <input type="text" id="form-native-place" class="form-control" placeholder="Hà Nội, Nghệ An, Quảng Nam...">
+            </div>
+
+            <div class="form-group">
+              <label>Dân Tộc</label>
+              <input type="text" id="form-ethnicity" class="form-control" value="Kinh">
+            </div>
+
+            <div class="form-group">
+              <label>Tôn Giáo</label>
+              <input type="text" id="form-religion" class="form-control" value="Không">
+            </div>
+
+            <div class="form-group">
+              <label>Tình Trạng Hôn Nhân</label>
+              <select id="form-marital-status" class="form-control">
+                <option value="Độc thân">Độc thân</option>
+                <option value="Đã có gia đình">Đã có gia đình</option>
+                <option value="Ly hôn">Ly hôn</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Số Con</label>
+              <input type="number" id="form-children-count" class="form-control" min="0" max="10" value="0">
+            </div>
+
+            <div class="form-group">
+              <label>Mã Số Thuế Cá Nhân</label>
+              <input type="text" id="form-tax-code" class="form-control" placeholder="8xxxxxxxxxx">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: VỊ TRÍ, CẤP BẬC & HỢP ĐỒNG -->
+        <div class="form-tab-pane" id="form-tab-job" style="display: none;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Phòng Ban / Đơn Vị Công Tác <span class="req">*</span></label>
+              <select id="form-dept-id" class="form-control" required></select>
+            </div>
+
+            <div class="form-group">
+              <label>Vị Trí Công Việc <span class="req">*</span></label>
+              <select id="form-pos-id" class="form-control" required></select>
+            </div>
+
+            <div class="form-group">
+              <label>Cấp Bậc Nhân Sự</label>
+              <select id="form-job-rank" class="form-control">
+                <option value="Cấp 1 - Học việc / Thực tập sinh">Cấp 1 - Học việc / Thực tập sinh</option>
+                <option value="Cấp 2 - Nhân viên Kỹ thuật / Lao động">Cấp 2 - Nhân viên Kỹ thuật / Lao động</option>
+                <option value="Cấp 3 - Chuyên viên / Nhân viên Nghiệp vụ">Cấp 3 - Chuyên viên / Nhân viên Nghiệp vụ</option>
+                <option value="Cấp 4 - Đội trưởng / Thợ Máy Chính / Lái máy">Cấp 4 - Đội trưởng / Thợ Máy Chính / Lái máy</option>
+                <option value="Cấp 5 - Kỹ sư Chính / Chuyên viên Quản lý Nghiệp vụ">Cấp 5 - Kỹ sư Chính / Chuyên viên Quản lý Nghiệp vụ</option>
+                <option value="Cấp 7 - Phó ban / Phó Giám đốc BĐH / Chỉ huy phó">Cấp 7 - Phó ban / Phó Giám đốc BĐH / Chỉ huy phó</option>
+                <option value="Cấp 8 - Trưởng ban / Giám đốc Ban Điều hành Dự án / Chỉ huy trưởng">Cấp 8 - Trưởng ban / Giám đốc Ban Điều hành Dự án / Chỉ huy trưởng</option>
+                <option value="Cấp 9 - Ban Tổng Giám đốc Điều hành">Cấp 9 - Ban Tổng Giám đốc Điều hành</option>
+                <option value="Cấp 10 - Ban Lãnh đạo Cấp cao (Chủ tịch / Phó Chủ tịch)">Cấp 10 - Ban Lãnh đạo Cấp cao (Chủ tịch / Phó Chủ tịch)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Chức Danh Chuyên Môn</label>
+              <input type="text" id="form-job-title" class="form-control" placeholder="Kỹ sư hiện trường, Kế toán trưởng...">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Địa Điểm Làm Việc</label>
+              <input type="text" id="form-work-location" class="form-control" placeholder="Trụ sở Tổng công ty / Dự án Phú Minh / Dự án Trung Nam...">
+            </div>
+
+            <div class="form-group">
+              <label>Quản Lý Trực Tiếp</label>
+              <select id="form-direct-mgr" class="form-control"></select>
+            </div>
+
+            <div class="form-group">
+              <label>Tính Chất Lao Động</label>
+              <select id="form-labor-nature" class="form-control">
+                <option value="Chính thức">Chính thức</option>
+                <option value="Thử việc">Thử việc</option>
+                <option value="Học việc">Học việc</option>
+                <option value="Thời vụ">Thời vụ</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Trạng Thái Làm Việc</label>
+              <select id="form-emp-status" class="form-control">
+                <option value="Đang làm việc">Đang làm việc</option>
+                <option value="Thử việc">Thử việc</option>
+                <option value="Tạm hoãn HĐ">Tạm hoãn HĐ</option>
+                <option value="Đã nghỉ việc">Đã nghỉ việc</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Loại Hợp Đồng Lao Động</label>
+              <select id="form-contract-type" class="form-control">
+                <option value="Hợp đồng lao động không xác định thời hạn">Hợp đồng lao động không xác định thời hạn</option>
+                <option value="Hợp đồng lao động xác định thời hạn (36 tháng)">Hợp đồng lao động xác định thời hạn (36 tháng)</option>
+                <option value="Hợp đồng lao động xác định thời hạn (12 tháng)">Hợp đồng lao động xác định thời hạn (12 tháng)</option>
+                <option value="Hợp đồng thử việc">Hợp đồng thử việc</option>
+                <option value="Hợp đồng lao động thời vụ">Hợp đồng lao động thời vụ</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Ngày Bắt Đầu Làm Việc</label>
+              <input type="date" id="form-start-date" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Ngày Kết Thúc (HĐ / Nghỉ việc)</label>
+              <input type="text" id="form-end-date" class="form-control" placeholder="YYYY-MM-DD hoặc Không xác định">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: CƯ TRÚ, CCCD & KHẨN CẤP -->
+        <div class="form-tab-pane" id="form-tab-contact" style="display: none;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Số ĐT Di Động <span class="req">*</span></label>
+              <input type="text" id="form-mobile" class="form-control" placeholder="098xxxxxxx" required>
+            </div>
+
+            <div class="form-group">
+              <label>Email Công Việc (@trunghaico.vn)</label>
+              <input type="email" id="form-email" class="form-control" placeholder="ten@trunghaico.vn">
+            </div>
+
+            <div class="form-group">
+              <label>Email Cá Nhân</label>
+              <input type="email" id="form-personal-email" class="form-control" placeholder="email@gmail.com">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Hộ Khẩu Thường Trú (Địa chỉ đầy đủ 4 cấp)</label>
+              <input type="text" id="form-perm-address" class="form-control" placeholder="Số nhà, Đường, Phường/Xã, Quận/Huyện, Tỉnh/TP">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Địa Chỉ Tạm Trú / Chỗ Ở Hiện Nay</label>
+              <input type="text" id="form-curr-address" class="form-control" placeholder="Số nhà, Đường, Phường/Xã, Quận/Huyện, Tỉnh/TP">
+            </div>
+
+            <div class="form-group">
+              <label>Số CCCD (12 Chữ Số)</label>
+              <input type="text" id="form-id-num" class="form-control" placeholder="00109xxxxxxxx">
+            </div>
+
+            <div class="form-group">
+              <label>Ngày Cấp CCCD</label>
+              <input type="date" id="form-id-date" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label>Nơi Cấp CCCD</label>
+              <input type="text" id="form-id-place" class="form-control" value="Cục Cảnh sát Quản lý hành chính về trật tự xã hội">
+            </div>
+
+            <div class="form-group">
+              <label>Số Hộ Chiếu (Passport)</label>
+              <input type="text" id="form-passport-num" class="form-control" placeholder="P0123456">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1; margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 10px;">
+              <strong style="font-size: 13px; color: var(--accent-red); display: block; margin-bottom: 6px;"><i class="fa-solid fa-phone-volume"></i> Thông Tin Liên Lạc Khẩn Cấp</strong>
+            </div>
+
+            <div class="form-group">
+              <label>Họ Tên Người Thân</label>
+              <input type="text" id="form-emergency-name" class="form-control" placeholder="Họ tên người thân">
+            </div>
+
+            <div class="form-group">
+              <label>Mối Quan Hệ</label>
+              <select id="form-emergency-relation" class="form-control">
+                <option value="Vợ">Vợ</option>
+                <option value="Chồng">Chồng</option>
+                <option value="Bố">Bố</option>
+                <option value="Mẹ">Mẹ</option>
+                <option value="Anh trai">Anh trai</option>
+                <option value="Chị gái">Chị gái</option>
+                <option value="Em trai">Em trai</option>
+                <option value="Người thân khác">Người thân khác</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>SĐT Liên Hệ Khẩn Cấp</label>
+              <input type="text" id="form-emergency-phone" class="form-control" placeholder="09xxxxxxxx">
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: LƯƠNG, BHXH & HỌC VẤN -->
+        <div class="form-tab-pane" id="form-tab-salary-edu" style="display: none;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Lương Cơ Bản (VNĐ) <span class="req">*</span></label>
+              <input type="number" id="form-salary" class="form-control" placeholder="15000000" required>
+            </div>
+
+            <div class="form-group">
+              <label>Tổng Lương / Thu Nhập (VNĐ)</label>
+              <input type="number" id="form-total-salary" class="form-control" placeholder="18000000">
+            </div>
+
+            <div class="form-group">
+              <label>Số Tài Khoản Ngân Hàng</label>
+              <input type="text" id="form-bank-acc" class="form-control" placeholder="Số tài khoản">
+            </div>
+
+            <div class="form-group">
+              <label>Tên Ngân Hàng</label>
+              <select id="form-bank-name" class="form-control">
+                <option value="Vietcombank">Vietcombank</option>
+                <option value="BIDV">BIDV</option>
+                <option value="VietinBank">VietinBank</option>
+                <option value="Techcombank">Techcombank</option>
+                <option value="MBBank">MBBank</option>
+                <option value="ACB">ACB</option>
+                <option value="Agribank">Agribank</option>
+                <option value="VPBank">VPBank</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Tên Chi Nhánh / Phòng Giao Dịch</label>
+              <input type="text" id="form-bank-branch" class="form-control" placeholder="Chi nhánh Hà Nội, Chi nhánh Tân Bình...">
+            </div>
+
+            <div class="form-group">
+              <label>Số Sổ BHXH / Mã Số BHXH</label>
+              <input type="text" id="form-bhxh-book" class="form-control" placeholder="Mã số 10 chữ số">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Nơi Đăng Ký Khám, Chữa Bệnh Ban Đầu</label>
+              <input type="text" id="form-hospital" class="form-control" placeholder="Bệnh viện Bạch Mai, Bệnh viện Chợ Rẫy...">
+            </div>
+
+            <div class="form-group">
+              <label>Trình Độ Học Vấn</label>
+              <select id="form-education-level" class="form-control">
+                <option value="Đại học">Đại học</option>
+                <option value="Thạc sĩ">Thạc sĩ</option>
+                <option value="Tiến sĩ">Tiến sĩ</option>
+                <option value="Cao đẳng">Cao đẳng</option>
+                <option value="Trung cấp">Trung cấp</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Trình Độ Chuyên Môn (Chuyên Ngành Học)</label>
+              <input type="text" id="form-major" class="form-control" placeholder="Kỹ thuật Xây dựng Cầu đường, Kế toán...">
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Bằng Cấp Chuyên Môn Khác & Chứng Chỉ Hành Nghề</label>
+              <input type="text" id="form-other-certs" class="form-control" placeholder="Chứng chỉ QLDA Hạng I, Chỉ huy trưởng, PMP, TOEIC...">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="background: #F8FAFC; border-top: 1px solid var(--border-color); padding: 12px 24px; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11.5px; color: var(--text-muted);">
+          <i class="fa-solid fa-circle-info"></i> Tất cả 34 trường thông tin sẽ được tự động đồng bộ vào CSDL JSON, Excel và Báo cáo.
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary" onclick="appEmployees.closeFormModal()">Hủy Bỏ</button>
+          <button type="submit" class="btn btn-primary" style="background: var(--primary-navy);"><i class="fa-solid fa-floppy-disk"></i> Lưu Thay Đổi</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: GOOGLE SHEETS CLOUD DATABASE MANAGEMENT
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-google-sheets">
+  <div class="modal-container" style="max-width: 560px; border-top: 3px solid #0F9D58;">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+      <div class="modal-title" style="color: #0F9D58; font-size: 14.5px; font-weight: 700;">
+        <i class="fa-solid fa-table-cells"></i>
+        <span>Quản Trị Google Sheets Cloud Database</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appSheets.closeModal()">&times;</button>
+    </div>
+
+    <div class="modal-body" style="padding: 20px 24px;">
+      <!-- Connection Status Card -->
+      <div id="sheets-connection-box" class="sheets-status-card success" style="margin-bottom: 18px; padding: 14px; border-radius: 8px; background: #ECFDF5; border: 1px solid #A7F3D0;">
+        <!-- Injected via sheets.js -->
+      </div>
+
+      <!-- Config Form -->
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label for="sheets-spreadsheet-id-input" style="display: block; font-size: 13px; font-weight: 600; color: var(--primary-navy); margin-bottom: 6px;">
+          Google Spreadsheet ID hoặc URL:
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="sheets-spreadsheet-id-input" class="form-control" style="flex: 1;" placeholder="Nhập Spreadsheet ID hoặc Link">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-save-sheets-config" onclick="appSheets.saveConfig()" style="color: #0F9D58; border-color: #A7F3D0; font-weight: 600;">
+            <i class="fa-solid fa-link"></i> Lưu & Kết Nối
+          </button>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-primary);">
+          <input type="checkbox" id="sheets-auto-sync-check" onchange="appSheets.saveConfig()" checked style="accent-color: #0F9D58; width: 16px; height: 16px;">
+          <span>Tự động đồng bộ mỗi khi thêm/sửa/xóa nhân sự (Auto-sync)</span>
+        </label>
+        <a id="sheets-open-link-btn" href="#" target="_blank" class="btn btn-sm btn-secondary" style="color: #2563EB; font-size: 12px; height: 28px; padding: 0 10px; display: none;">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Sheet
+        </a>
+      </div>
+
+      <!-- Sync Actions Group -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+        <button type="button" class="btn btn-primary" id="btn-sheets-sync-now" onclick="appSheets.syncToCloud()" style="height: 40px; font-size: 13px; background: #0F9D58; border-color: #0F9D58; justify-content: center;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Đẩy Lên Google Sheet (Sync All)
+        </button>
+
+        <button type="button" class="btn btn-secondary" id="btn-sheets-pull-now" onclick="appSheets.pullFromCloud()" style="height: 40px; font-size: 13px; justify-content: center;">
+          <i class="fa-solid fa-cloud-arrow-down"></i> Tải Về Từ Google Sheet (Pull All)
+        </button>
+      </div>
+
+      <div style="text-align: center; padding-top: 8px;">
+        <a href="/setup" style="font-size: 12px; color: var(--text-secondary); text-decoration: none; font-weight: 500;">
+          <i class="fa-solid fa-sliders"></i> Mở Trình Hướng Dẫn Cấu Hình Ban Đầu (Setup Wizard)
+        </a>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="padding: 12px 20px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="appSheets.closeModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Logout Confirmation Modal -->
+<div class="modal-backdrop" id="modal-logout-confirm">
+  <div class="modal-container" style="max-width: 400px; border-top: 3px solid var(--accent-red);">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 12px 18px;">
+      <div class="modal-title" style="color: var(--accent-red); font-size: 14px;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Xác Nhận Đăng Xuất</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appAuth.closeLogoutModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 20px 24px; text-align: center;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--accent-red-soft); color: var(--accent-red); display: inline-flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 12px;">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </div>
+      <h3 style="font-size: 14.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Bạn có chắc chắn muốn đăng xuất?</h3>
+      <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">Phiên làm việc của bạn sẽ kết thúc. Bạn sẽ cần đăng nhập lại để tiếp tục sử dụng hệ thống.</p>
+    </div>
+    <div class="modal-footer" style="padding: 14px 24px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; gap: 12px; justify-content: center;">
+      <button type="button" class="btn btn-secondary" onclick="appAuth.closeLogoutModal()" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; justify-content: center;">
+        Hủy bỏ
+      </button>
+      <button type="button" class="btn btn-accent" id="btn-confirm-logout-action" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; justify-content: center; box-shadow: 0 2px 8px rgba(229, 33, 37, 0.25);">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Đăng xuất</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     LOGIN SCREEN (FULLSCREEN AUTHENTICATION MODAL)
+     ========================================================================== -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-header">
+      <img src="assets/logo.png" alt="TRUNG HẢI Logo" class="login-logo">
+      <div class="login-title">ĐĂNG NHẬP HỆ THỐNG HRM</div>
+      <div class="login-subtitle">CÔNG TY CỔ PHẦN ĐẦU TƯ VÀ XÂY DỰNG TRUNG HẢI</div>
+    </div>
+
+    <form id="login-form">
+      <div class="login-body">
+        <div class="login-input-group">
+          <label for="login-username">Tên đăng nhập / Mã NV / Email</label>
+          <div class="login-input-wrapper">
+            <i class="fa-solid fa-user input-icon"></i>
+            <input type="text" id="login-username" placeholder="Vui lòng nhập username" required>
+          </div>
+        </div>
+
+        <div class="login-input-group">
+          <label for="login-password">Mật khẩu truy cập</label>
+          <div class="login-input-wrapper">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input type="password" id="login-password" placeholder="Vui lòng nhập password" required>
+            <button type="button" class="btn-toggle-pass" id="btn-toggle-password" title="Hiện / Ẩn mật khẩu">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-login-submit">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>Đăng Nhập Vào Hệ Thống</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: ADD / EDIT SYSTEM ACCOUNT & RBAC
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-account-form">
+  <div class="modal-container" style="max-width: 500px;">
+    <div class="modal-header">
+      <div class="modal-title">
+        <i class="fa-solid fa-user-shield"></i>
+        <span id="acc-modal-title">Cấp Tài Khoản Mới</span>
+      </div>
+      <button class="modal-close" onclick="appAccounts.closeFormModal()">&times;</button>
+    </div>
+
+    <form id="form-account-action">
+      <div class="modal-body">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label>Chọn Nhân Viên Cần Cấp Tài Khoản <span class="req">*</span></label>
+            <input type="hidden" id="acc-form-emp-id" required>
+            
+            <div class="emp-picker-container" id="acc-emp-picker-container">
+              <div class="emp-picker-search-box" id="acc-emp-search-wrapper">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="acc-emp-search-input" placeholder="Tìm theo tên, mã NV, chức vụ (VD: TH-01, Sơn...)" autocomplete="off">
+              </div>
+              <div class="emp-picker-list" id="acc-emp-picker-list">
+                <!-- Dynamic Employee Cards -->
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Email Đăng Nhập <span class="req">*</span></label>
+            <input type="email" id="acc-form-email" class="form-control" placeholder="ten@trunghaico.vn" required>
+          </div>
+
+          <div class="form-group">
+            <label>Phân Quyền (Vai Trò) <span class="req">*</span></label>
+            <select id="acc-form-role" class="form-control" required>
+              <option value="ADMIN">👑 Admin (Toàn quyền quản trị hệ thống)</option>
+              <option value="USER" selected>👤 User (Người dùng)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="acc-password-group">
+            <label>Mật Khẩu Ban Đầu</label>
+            <input type="text" id="acc-form-password" class="form-control" value="123456">
+          </div>
+
+          <div class="form-group">
+            <label>Trạng Thái Tài Khoản</label>
+            <select id="acc-form-status" class="form-control">
+              <option value="Kích hoạt">Kích hoạt (Cho phép đăng nhập)</option>
+              <option value="Đã khóa">Tạm khóa tài khoản</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="appAccounts.closeFormModal()">Hủy</button>
+        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Lưu Phân Quyền</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: RESET / CHANGE PASSWORD
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-account-reset-pass">
+  <div class="modal-container" style="max-width: 440px;">
+    <div class="modal-header" style="background: #1C3381; color: #FFFFFF;">
+      <div class="modal-title">
+        <i class="fa-solid fa-key" style="color: #F59E0B;"></i>
+        <span>Đổi / Đặt Lại Mật Khẩu</span>
+      </div>
+      <button class="modal-close" onclick="appAccounts.closeResetPassModal()">&times;</button>
+    </div>
+
+    <form id="form-reset-password-action">
+      <div class="modal-body" style="padding: 20px;">
+        <div style="margin-bottom: 14px; padding: 10px 12px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+          <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Tài khoản:</div>
+          <div id="reset-pass-user-info" style="font-size: 13px; font-weight: 700; color: var(--primary-navy); margin-top: 2px;"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Mật Khẩu Mới <span class="req">*</span></label>
+          <input type="text" id="reset-pass-new-input" class="form-control" placeholder="Nhập mật khẩu mới" required value="123456">
+          <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px;">Mật khẩu mặc định khuyến nghị: 123456</small>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="appAccounts.closeResetPassModal()">Hủy</button>
+        <button type="submit" class="btn btn-accent"><i class="fa-solid fa-key"></i> Xác Nhận Đổi Mật Khẩu</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: CONFIRM DELETE ACCOUNT
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-account-delete-confirm">
+  <div class="modal-container" style="max-width: 400px; border-top: 3px solid var(--accent-red);">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 12px 18px;">
+      <div class="modal-title" style="color: var(--accent-red); font-size: 14px;">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Xác Nhận Xóa Tài Khoản</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appAccounts.closeDeleteModal()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 20px 24px; text-align: center;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--accent-red-soft); color: var(--accent-red); display: inline-flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 12px;">
+        <i class="fa-solid fa-trash-can"></i>
+      </div>
+      <h3 style="font-size: 14.5px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Xóa tài khoản đăng nhập?</h3>
+      <p id="delete-acc-user-info" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); margin-bottom: 6px;"></p>
+      <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">Người dùng này sẽ không thể đăng nhập vào WebApp nữa. Bạn có thể cấp lại tài khoản bất kỳ lúc nào.</p>
+    </div>
+    <div class="modal-footer" style="padding: 14px 24px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; gap: 12px; justify-content: center;">
+      <button type="button" class="btn btn-secondary" onclick="appAccounts.closeDeleteModal()" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; justify-content: center;">
+        Hủy bỏ
+      </button>
+      <button type="button" class="btn btn-accent" id="btn-confirm-delete-account" style="flex: 1; height: 38px; font-size: 13px; font-weight: 600; justify-content: center; box-shadow: 0 2px 8px rgba(229, 33, 37, 0.25);">
+        <i class="fa-solid fa-trash"></i>
+        <span>Xóa Tài Khoản</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: GOOGLE SHEETS CLOUD DATABASE SYNC
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-google-sheets">
+  <div class="modal-container" style="max-width: 580px; border-top: 3px solid #0F9D58;">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+      <div class="modal-title" style="color: #0F9D58; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-table-cells"></i>
+        <span>Đồng Bộ Cơ Sở Dữ Liệu Google Sheets</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appSheets.closeModal()">&times;</button>
+    </div>
+
+    <div class="modal-body" style="padding: 20px 24px;">
+      <!-- Connection Status Card -->
+      <div id="sheets-connection-box" class="sheets-status-card warning">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <i class="fa-solid fa-spinner fa-spin"></i>
+          <span>Đang tải thông tin kết nối...</span>
+        </div>
+      </div>
+
+      <!-- Quick Steps Guide -->
+      <div class="sheets-steps-guide">
+        <strong><i class="fa-solid fa-circle-info" style="color: var(--primary-navy);"></i> Hướng dẫn kết nối:</strong>
+        <ol>
+          <li>Tạo file Google Trang tính hoặc lưu file Excel hiện có dưới dạng <strong>Google Trang tính</strong>.</li>
+          <li>Bấm <strong>Chia sẻ</strong> và thêm email: <code style="background: #E2E8F0; padding: 1px 4px; border-radius: 3px; user-select: all; font-weight: 600;">hrm-sheet-service@make-472708.iam.gserviceaccount.com</code> (Quyền Editor).</li>
+          <li>Dán <strong>Link hoặc Spreadsheet ID</strong> vào ô bên dưới và bấm <strong>Lưu & Kết Nối</strong>.</li>
+        </ol>
+      </div>
+
+      <!-- Form Inputs -->
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label style="font-weight: 600; font-size: 12.5px; margin-bottom: 6px; display: block;">
+          Google Spreadsheet ID hoặc Link URL <span class="req">*</span>
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="sheets-spreadsheet-id-input" class="form-control" placeholder="Dán link https://docs.google.com/spreadsheets/d/... hoặc Spreadsheet ID" style="flex: 1; font-size: 12px; font-family: monospace;">
+          <button type="button" class="btn btn-primary" id="btn-sheets-save" onclick="appSheets.saveConfig()" style="font-size: 12.5px; white-space: nowrap;">
+            <i class="fa-solid fa-link"></i> Lưu & Kết Nối
+          </button>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 8px 12px; background: var(--bg-subtle); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer; margin: 0; font-weight: 500;">
+          <input type="checkbox" id="sheets-auto-sync-check" checked style="width: 16px; height: 16px; accent-color: #0F9D58;">
+          <span>Tự động đồng bộ lên Google Sheets khi thêm/sửa/xóa</span>
+        </label>
+        <a id="sheets-open-link-btn" href="#" target="_blank" class="btn btn-sm btn-secondary" style="font-size: 11.5px; display: none; text-decoration: none;">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Trang Tính
+        </a>
+      </div>
+
+      <!-- Sync Actions -->
+      <div style="border-top: 1px solid var(--border-color); padding-top: 16px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; text-transform: uppercase;">
+          Thao Tác Đồng Bộ Toàn Bộ (14 Bảng)
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-secondary" id="btn-sheets-sync-now" onclick="appSheets.syncToCloud()" style="flex: 1; height: 38px; font-size: 12.5px; font-weight: 600; justify-content: center;">
+            <i class="fa-solid fa-cloud-arrow-up" style="color: #0F9D58;"></i>
+            <span>Đẩy Lên Google Sheet (Sync All)</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="btn-sheets-pull-now" onclick="appSheets.pullFromCloud()" style="flex: 1; height: 38px; font-size: 12.5px; font-weight: 600; justify-content: center;">
+            <i class="fa-solid fa-cloud-arrow-down" style="color: #2563EB;"></i>
+            <span>Tải Về Từ Google Sheet (Pull All)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer" style="padding: 12px 20px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end;">
+      <button type="button" class="btn btn-secondary" onclick="appSheets.closeModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: COMPANY BRANDING & SETTINGS (CÀI ĐẶT THƯƠNG HIỆU DOANH NGHIỆP)
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-company-settings">
+  <div class="modal-container" style="max-width: 620px; border-top: 3px solid var(--primary-navy);">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+      <div class="modal-title" style="color: var(--primary-navy); font-size: 15px; font-weight: 700;">
+        <i class="fa-solid fa-building-circle-check"></i>
+        <span>Cài Đặt Nhận Diện Thương Hiệu Doanh Nghiệp</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appCompany.closeModal()">&times;</button>
+    </div>
+
+    <form id="form-company-settings">
+      <div class="modal-body" style="padding: 20px 24px; max-height: calc(85vh - 120px); overflow-y: auto;">
+        
+        <!-- Logo Upload Card -->
+        <div style="display: flex; gap: 20px; align-items: center; background: #F8FAFC; border: 1px solid var(--border-color); padding: 16px; border-radius: 4px; margin-bottom: 20px;">
+          <div style="text-align: center; flex-shrink: 0;">
+            <div style="width: 80px; height: 80px; border-radius: 4px; background: #FFFFFF; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; padding: 6px; margin-bottom: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+              <img id="modal-company-logo-preview" src="assets/logo.png" alt="Company Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+            </div>
+            <span style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">Logo Hiện Tại</span>
+          </div>
+
+          <div style="flex: 1;">
+            <input type="file" id="company-logo-file-input" accept="image/png, image/jpeg, image/svg+xml, image/webp" style="display: none;">
+            <div id="company-logo-dropzone" style="border: 2px dashed var(--border-color); background: #FFFFFF; border-radius: 4px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
+              <i class="fa-solid fa-cloud-arrow-up" style="color: var(--primary-navy); font-size: 20px; margin-bottom: 4px; display: block;"></i>
+              <div style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy);">Chọn ảnh hoặc Kéo & Thả logo vào đây</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Hỗ trợ: PNG, JPG, SVG, WebP (Tối đa 5MB)</div>
+            </div>
+            <div style="margin-top: 8px; display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('company-logo-file-input').click()" style="font-size: 11.5px; height: 28px;">
+                <i class="fa-solid fa-folder-open"></i> Chọn Ảnh Khác
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="appCompany.resetDefaultLogo()" style="font-size: 11.5px; height: 28px; color: var(--text-secondary);">
+                <i class="fa-solid fa-rotate-left"></i> Logo Gốc
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Brand Identity Inputs -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+          <div class="form-group">
+            <label for="company-input-brand" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+              Tên Thương Hiệu (Hiển thị Menu) <span class="req" style="color: var(--accent-red);">*</span>
+            </label>
+            <input type="text" id="company-input-brand" class="form-control" placeholder="Ví dụ: TRUNG HẢI" required>
+          </div>
+
+          <div class="form-group">
+            <label for="company-input-subtitle" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+              Khẩu Hiệu / Subtitle Menu
+            </label>
+            <input type="text" id="company-input-subtitle" class="form-control" placeholder="Ví dụ: HRM ENTERPRISE">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="company-input-fullname" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Tên Doanh Nghiệp Đầy Đủ (Đăng nhập & Báo cáo) <span class="req" style="color: var(--accent-red);">*</span>
+          </label>
+          <input type="text" id="company-input-fullname" class="form-control" placeholder="Ví dụ: CÔNG TY CỔ PHẦN ĐẦU TƯ VÀ XÂY DỰNG TRUNG HẢI" required>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+          <div class="form-group">
+            <label for="company-input-tax" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+              Mã Số Thuế Doanh Nghiệp
+            </label>
+            <input type="text" id="company-input-tax" class="form-control" placeholder="0101234567">
+          </div>
+
+          <div class="form-group">
+            <label for="company-input-phone" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+              Hotline / Số Điện Thoại
+            </label>
+            <input type="text" id="company-input-phone" class="form-control" placeholder="024.1234.5678">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+          <div class="form-group">
+            <label for="company-input-email" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+              Email Doanh Nghiệp
+            </label>
+            <input type="email" id="company-input-email" class="form-control" placeholder="contact@domain.com">
+          </div>
+
+          <div class="form-group">
+            <label for="company-input-website" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+              Website Công Ty
+            </label>
+            <input type="url" id="company-input-website" class="form-control" placeholder="https://domain.com">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="company-input-address" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Địa Chỉ Trụ Sở Chính
+          </label>
+          <input type="text" id="company-input-address" class="form-control" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố">
+        </div>
+
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 24px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11.5px; color: var(--text-secondary);">
+          <i class="fa-solid fa-circle-info"></i> Thay đổi sẽ cập nhật ngay trên toàn bộ giao diện và báo cáo.
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary" onclick="appCompany.closeModal()">Hủy Bỏ</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-company-settings" style="background: var(--primary-navy);">
+            <i class="fa-solid fa-floppy-disk"></i> Lưu Nhận Diện Doanh Nghiệp
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: ADD / EDIT DEPARTMENT (THÊM / SỬA PHÒNG BAN)
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-dept-form">
+  <div class="modal-container" style="max-width: 520px; border-top: 3px solid var(--primary-navy);">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+      <div class="modal-title" style="color: var(--primary-navy); font-size: 15px; font-weight: 700;">
+        <i class="fa-solid fa-building-circle-check"></i>
+        <span id="dept-modal-title">Thêm Phòng Ban / Đơn Vị Mới</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appOrganization.closeDeptModal()">&times;</button>
+    </div>
+
+    <form id="form-dept-action">
+      <div class="modal-body" style="padding: 20px 24px;">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="dept-form-id" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Mã Phòng Ban / Đơn Vị <span class="req" style="color: var(--accent-red);">*</span>
+          </label>
+          <input type="text" id="dept-form-id" class="form-control" placeholder="Ví dụ: KDOANH, MKT, CSKH..." required style="text-transform: uppercase;">
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Mã viết liền không dấu, viết hoa (duy nhất).</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="dept-form-name" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Tên Phòng Ban / Đơn Vị / Dự Án <span class="req" style="color: var(--accent-red);">*</span>
+          </label>
+          <input type="text" id="dept-form-name" class="form-control" placeholder="Ví dụ: Phòng Kinh Doanh & Tiếp Thị" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="dept-form-parent" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Đơn Vị Cấp Trên / Trực Thuộc
+          </label>
+          <select id="dept-form-parent" class="form-control">
+            <option value="">-- Không có (Cấp cao nhất / Ban Giám Đốc) --</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="dept-form-manager" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Trưởng Đơn Vị / Quản Lý
+          </label>
+          <select id="dept-form-manager" class="form-control">
+            <option value="">-- Chọn Trưởng phòng / Quản lý --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="dept-form-status" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Trạng Thái Hoạt Động
+          </label>
+          <select id="dept-form-status" class="form-control">
+            <option value="Hoạt động" selected>Hoạt động</option>
+            <option value="Tạm ngưng">Tạm ngưng</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 24px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-secondary" onclick="appOrganization.closeDeptModal()">Hủy Bỏ</button>
+        <button type="submit" class="btn btn-primary" id="btn-save-dept" style="background: var(--primary-navy);">
+          <i class="fa-solid fa-floppy-disk"></i> Lưu Phòng Ban
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: ADD / EDIT POSITION (THÊM / SỬA VỊ TRÍ CHỨC DANH)
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-pos-form">
+  <div class="modal-container" style="max-width: 520px; border-top: 3px solid var(--primary-navy);">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+      <div class="modal-title" style="color: var(--primary-navy); font-size: 15px; font-weight: 700;">
+        <i class="fa-solid fa-briefcase"></i>
+        <span id="pos-modal-title">Thêm Vị Trí / Chức Danh Mới</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appOrganization.closePosModal()">&times;</button>
+    </div>
+
+    <form id="form-pos-action">
+      <div class="modal-body" style="padding: 20px 24px;">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="pos-form-id" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Mã Vị Trí / Chức Danh <span class="req" style="color: var(--accent-red);">*</span>
+          </label>
+          <input type="text" id="pos-form-id" class="form-control" placeholder="Ví dụ: POS-SALES, POS-DEV..." required style="text-transform: uppercase;">
+          <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Mã viết liền không dấu, viết hoa (duy nhất).</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="pos-form-name" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Tên Vị Trí / Chức Danh Công Việc <span class="req" style="color: var(--accent-red);">*</span>
+          </label>
+          <input type="text" id="pos-form-name" class="form-control" placeholder="Ví dụ: Chuyên Viên Kinh Doanh Cao Cấp" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="pos-form-dept" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Thuộc Phòng Ban / Đơn Vị
+          </label>
+          <select id="pos-form-dept" class="form-control">
+            <option value="">-- Tất cả / Chung cho toàn công ty --</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="pos-form-level" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Cấp Bậc Nhân Sự
+          </label>
+          <select id="pos-form-level" class="form-control">
+            <option value="Cấp 1 - Lãnh đạo cấp cao / Ban Giám Đốc">Cấp 1 - Lãnh đạo cấp cao / Ban Giám Đốc</option>
+            <option value="Cấp 2 - Trưởng / Phó Phòng / Quản lý">Cấp 2 - Trưởng / Phó Phòng / Quản lý</option>
+            <option value="Cấp 3 - Chuyên viên / Nhân viên Nghiệp vụ" selected>Cấp 3 - Chuyên viên / Nhân viên Nghiệp vụ</option>
+            <option value="Cấp 4 - Nhân viên / Công nhân Trực tiếp">Cấp 4 - Nhân viên / Công nhân Trực tiếp</option>
+            <option value="Cấp 5 - Thực tập sinh / Thử việc">Cấp 5 - Thực tập sinh / Thử việc</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="pos-form-status" style="font-size: 12.5px; font-weight: 600; color: var(--primary-navy); display: block; margin-bottom: 4px;">
+            Trạng Thái Hoạt Động
+          </label>
+          <select id="pos-form-status" class="form-control">
+            <option value="Hoạt động" selected>Hoạt động</option>
+            <option value="Tạm ngưng">Tạm ngưng</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 12px 24px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-secondary" onclick="appOrganization.closePosModal()">Hủy Bỏ</button>
+        <button type="submit" class="btn btn-primary" id="btn-save-pos" style="background: var(--primary-navy);">
+          <i class="fa-solid fa-floppy-disk"></i> Lưu Vị Trí
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==========================================================================
+     MODAL: IMPORT EMPLOYEES FROM EXCEL (NHẬP NHÂN SỰ TỪ FILE EXCEL)
+     ========================================================================== -->
+<div class="modal-backdrop" id="modal-import-employees">
+  <div class="modal-container" style="max-width: 960px; border-top: 3px solid #10B981;">
+    <div class="modal-header" style="background: #FFFFFF; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding: 14px 20px;">
+      <div class="modal-title" style="color: #047857; font-size: 15px; font-weight: 700;">
+        <i class="fa-solid fa-file-excel" style="color: #10B981;"></i>
+        <span>Nhập Danh Sách Nhân Sự Hàng Loạt Từ File Excel</span>
+      </div>
+      <button class="modal-close" style="color: var(--text-secondary);" onclick="appImport.closeModal()">&times;</button>
+    </div>
+
+    <!-- Stepper Navigation -->
+    <div style="display: flex; background: #F8FAFC; border-bottom: 1px solid var(--border-color); padding: 0 20px;">
+      <div id="import-stepper-1" onclick="appImport.setStepUI(1)" style="padding: 10px 18px; font-size: 13px; font-weight: 700; color: var(--primary-navy); border-bottom: 2px solid var(--primary-navy); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+        <i class="fa-solid fa-upload"></i> 1. Tải Lên File Excel
+      </div>
+      <div id="import-stepper-2" style="padding: 10px 18px; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: default; display: flex; align-items: center; gap: 6px;">
+        <i class="fa-solid fa-shield-halved"></i> 2. Kiểm Tra & Đối Soát Trùng Lặp Primary Key
+      </div>
+    </div>
+
+    <div class="modal-body" style="padding: 20px 24px; max-height: calc(85vh - 170px); overflow-y: auto;">
+      
+      <!-- Step 1: Template Download Banner -->
+      <div id="import-step1-banner" style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 4px; padding: 14px 18px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 280px;">
+          <div style="font-size: 13px; font-weight: 700; color: #166534; margin-bottom: 4px;">
+            <i class="fa-solid fa-circle-down"></i> Tải File Mẫu Chuẩn Định Dạng Excel (Đầy Đủ 64 Cột Nghiệp Vụ)
+          </div>
+          <div style="font-size: 12px; color: #15803D; line-height: 1.4;">
+            File mẫu đã tích hợp đầy đủ 64 trường thông tin của 8 phân hệ hồ sơ (kèm mẫu dữ liệu) và danh mục mã Phòng ban, Vị trí chuẩn để tra cứu.
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-sm" id="btn-download-import-template" style="background: #10B981; color: #FFFFFF; font-weight: 600; height: 34px; padding: 0 14px; border: none; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); white-space: nowrap;">
+            <i class="fa-solid fa-download"></i> Tải File Mẫu (.xlsx)
+          </button>
+          <button type="button" class="btn btn-sm" id="btn-download-sample-1000" style="background: #0284C7; color: #FFFFFF; font-weight: 600; height: 34px; padding: 0 14px; border: none; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); white-space: nowrap;">
+            <i class="fa-solid fa-users-viewfinder"></i> Tải 1.000 Nhân Sự Mẫu (.xlsx)
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 1: Upload Dropzone Area -->
+      <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" style="display: none;">
+      <div id="excel-dropzone" style="border: 2px dashed #CBD5E1; background: #F8FAFC; border-radius: 4px; padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease;">
+        <i class="fa-solid fa-cloud-arrow-up" style="color: #10B981; font-size: 40px; margin-bottom: 12px; display: block;"></i>
+        <div style="font-size: 14.5px; font-weight: 700; color: var(--primary-navy);">Kéo & Thả file Excel vào đây hoặc click để chọn file</div>
+        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">Hệ thống sẽ tự động quét, kiểm tra trùng lặp Primary Key (Mã NV, CCCD, Email, Mã chấm công) trước khi nhập.</div>
+      </div>
+
+      <!-- Step 2: Preview & Validation Container (Shown when file is parsed) -->
+      <div id="import-preview-container" style="display: none;">
+        
+        <!-- Controls & Options Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; background: #F8FAFC; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 4px;">
+          <div id="import-stat-summary"></div>
+          
+          <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-primary); cursor: pointer; margin: 0;">
+              <input type="checkbox" id="import-chk-overwrite" checked style="cursor: pointer; accent-color: #D97706;">
+              <span>Ghi đè thông tin nếu trùng Mã NV</span>
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #166534; cursor: pointer; margin: 0;">
+              <input type="checkbox" id="import-chk-skip-errors" checked style="cursor: pointer; accent-color: #10B981;">
+              <span>Tự động bỏ qua dòng lỗi / xung đột</span>
+            </label>
+
+            <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('excel-file-input').click()" style="font-size: 11.5px; height: 28px;">
+              <i class="fa-solid fa-folder-open"></i> Chọn File Khác
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div class="table-responsive" style="max-height: 360px; border: 1px solid var(--border-color); border-radius: 4px;">
+          <table class="data-table" style="margin: 0; font-size: 12px;">
+            <thead style="position: sticky; top: 0; background: #F8FAFC; z-index: 10;">
+              <tr>
+                <th style="width: 40px; text-align: center;">STT</th>
+                <th style="width: 140px; text-align: center;">Đánh Giá Trùng Lặp</th>
+                <th style="width: 100px;">Mã NV</th>
+                <th style="width: 220px;">Họ và Tên & Chi Tiết Lỗi</th>
+                <th style="width: 75px;">Giới Tính</th>
+                <th style="width: 130px;">Số CCCD / CMND</th>
+                <th style="width: 180px;">Email Công Việc</th>
+                <th style="width: 120px;">Phòng Ban</th>
+                <th style="width: 130px;">Vị Trí</th>
+              </tr>
+            </thead>
+            <tbody id="import-preview-tbody">
+              <!-- Rendered via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="modal-footer" style="padding: 12px 24px; background: #F8FAFC; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+      <div style="font-size: 11.5px; color: var(--text-secondary);">
+        <i class="fa-solid fa-shield-check" style="color: #10B981;"></i> Toàn bộ dữ liệu được kiểm tra xung đột tính toàn vẹn (Primary Key Integrity) trước khi ghi vào CSDL.
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="btn btn-secondary" onclick="appImport.closeModal()">Hủy Bỏ</button>
+        <button type="button" class="btn btn-primary" id="btn-submit-excel-import" disabled style="background: #10B981; border-color: #059669;">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Xác Nhận Nhập Dữ Liệu
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- JavaScript Application Modules -->
+<script src="js/data.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/company.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/employees.js"></script>
+<script src="js/import.js"></script>
+<script src="js/resigned.js"></script>
+<script src="js/organization.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/accounts.js"></script>
+<script src="js/logs.js"></script>
+<script src="js/trash.js"></script>
+<script src="js/sheets.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,14 @@
+node_modules/
+*.temp.xlsx
+.DS_Store
+Thumbs.db
+
+# Security & Private Credentials
+*.json.key
+*service-account*.json
+make-*.json
+credentials*.json
+sheets.key.json
+.env
+.env.local
+*.log
