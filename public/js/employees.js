@@ -1,5 +1,5 @@
 // ==========================================================================
-// EMPLOYEE MANAGEMENT MODULE (Cập nhật tính năng Xóa hàng loạt)
+// EMPLOYEE MANAGEMENT MODULE (Cập nhật Chọn tất cả & Xóa hàng loạt)
 // ==========================================================================
 
 const appEmployees = {
@@ -8,7 +8,7 @@ const appEmployees = {
   pageSize: 25,
   filteredList: [],
   selectedEmployee: null,
-  selectedIds: new Set(), // Quản lý danh sách ID nhân viên được tích chọn hàng loạt
+  selectedIds: new Set(), // Quản lý danh sách ID nhân viên được tích chọn
 
   init() {
     this.populateFilterDropdowns();
@@ -20,7 +20,6 @@ const appEmployees = {
   },
 
   populateFilterDropdowns() {
-    // Dept filter
     const deptSelect = document.getElementById('emp-filter-dept');
     const formDeptSelect = document.getElementById('form-dept-id');
     if (deptSelect && formDeptSelect) {
@@ -29,7 +28,6 @@ const appEmployees = {
       formDeptSelect.innerHTML = `<option value="">-- Chọn Đơn vị / Phòng ban --</option>` + opts;
     }
 
-    // Pos filter
     const posSelect = document.getElementById('emp-filter-pos');
     const formPosSelect = document.getElementById('form-pos-id');
     if (posSelect && formPosSelect) {
@@ -38,7 +36,6 @@ const appEmployees = {
       formPosSelect.innerHTML = `<option value="">-- Chọn Vị trí Công việc --</option>` + opts;
     }
 
-    // Direct manager dropdown for form
     const formMgrSelect = document.getElementById('form-direct-mgr');
     if (formMgrSelect) {
       const activeEmps = appData.employees.filter(e => e.employment_status === 'Đang làm việc');
@@ -48,7 +45,6 @@ const appEmployees = {
   },
 
   attachEventListeners() {
-    // Search input
     const searchInput = document.getElementById('emp-search-input');
     if (searchInput) {
       searchInput.addEventListener('input', () => {
@@ -57,7 +53,6 @@ const appEmployees = {
       });
     }
 
-    // Filters
     ['emp-filter-dept', 'emp-filter-pos', 'emp-filter-status', 'emp-filter-nature'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
@@ -68,7 +63,6 @@ const appEmployees = {
       }
     });
 
-    // Reset filters
     const resetBtn = document.getElementById('btn-reset-filters');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
@@ -82,7 +76,7 @@ const appEmployees = {
       });
     }
 
-    // Detail Modal Tabs Navigation
+    // Modal Tabs Navigation
     document.querySelectorAll('#modal-employee-detail .modal-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const targetTab = e.currentTarget.getAttribute('data-tab');
@@ -95,7 +89,6 @@ const appEmployees = {
       });
     });
 
-    // Form Modal Tabs Navigation
     document.querySelectorAll('.form-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const targetTab = e.currentTarget.getAttribute('data-tab');
@@ -114,19 +107,12 @@ const appEmployees = {
       });
     });
 
-    // Add Employee Button
     const addBtn = document.getElementById('btn-open-add-modal');
-    if (addBtn) {
-      addBtn.addEventListener('click', () => this.openAddModal());
-    }
+    if (addBtn) addBtn.addEventListener('click', () => this.openAddModal());
 
-    // Form Submit
     const form = document.getElementById('employee-crud-form');
-    if (form) {
-      form.addEventListener('submit', (e) => this.handleFormSubmit(e));
-    }
+    if (form) form.addEventListener('submit', (e) => this.handleFormSubmit(e));
 
-    // Edit from Detail
     const editFromDetBtn = document.getElementById('btn-edit-from-detail');
     if (editFromDetBtn) {
       editFromDetBtn.addEventListener('click', () => {
@@ -137,7 +123,6 @@ const appEmployees = {
       });
     }
 
-    // Page size filter
     const pageSizeSelect = document.getElementById('emp-page-size');
     if (pageSizeSelect) {
       pageSizeSelect.addEventListener('change', (e) => {
@@ -148,7 +133,6 @@ const appEmployees = {
       });
     }
 
-    // Export Filtered
     const exportFilteredBtn = document.getElementById('btn-export-filtered-emp');
     if (exportFilteredBtn) {
       exportFilteredBtn.addEventListener('click', () => this.exportFilteredExcel());
@@ -194,7 +178,6 @@ const appEmployees = {
       return true;
     });
 
-    // Mặc định sắp xếp theo mã nhân viên (A-Z tự nhiên)
     this.filteredList.sort((a, b) => (a.employee_id || '').localeCompare(b.employee_id || '', undefined, { numeric: true, sensitivity: 'base' }));
 
     this.renderTable();
@@ -224,7 +207,7 @@ const appEmployees = {
       const stt = start + index + 1;
       const c = contactMap[e.employee_id] || {};
       const isChecked = this.selectedIds.has(e.employee_id);
-      
+
       const statusBadge = e.employment_status === 'Đang làm việc'
         ? '<span class="badge badge-active"><i class="fa-solid fa-check"></i> Đang làm việc</span>'
         : '<span class="badge badge-resigned"><i class="fa-solid fa-xmark"></i> Đã nghỉ việc</span>';
@@ -237,7 +220,7 @@ const appEmployees = {
 
       return `
         <tr class="${isChecked ? 'row-selected' : ''}">
-          <td style="text-align: center; width: 40px;">
+          <td style="text-align: center; width: 40px; background: #FFFFFF; position: sticky; left: 0; z-index: 4;">
             <input type="checkbox" class="emp-checkbox" value="${e.employee_id}" ${isChecked ? 'checked' : ''} onchange="appEmployees.toggleRowSelect('${e.employee_id}', this.checked)">
           </td>
           <td class="col-sticky-stt" style="color: var(--text-muted); font-size: 12px; font-weight: 500;">${stt}</td>
@@ -272,16 +255,16 @@ const appEmployees = {
       `;
     }).join('');
 
-    // Check trạng thái của checkbox "Chọn tất cả" trên header bảng nếu có
     const selectAllCheck = document.getElementById('select-all-emp');
     if (selectAllCheck && paginated.length > 0) {
       selectAllCheck.checked = paginated.every(e => this.selectedIds.has(e.employee_id));
     }
   },
 
-  // Chọn / Bỏ chọn tất cả trang hiện tại
+  // Chọn / Bỏ chọn toàn bộ nhân sự trong trang hiện tại
   toggleSelectAll(masterCheckbox) {
-    const paginated = this.filteredList.slice((this.currentPage - 1) * this.pageSize, this.currentPage * this.pageSize);
+    const start = (this.currentPage - 1) * this.pageSize;
+    const paginated = this.filteredList.slice(start, start + this.pageSize);
     paginated.forEach(e => {
       if (masterCheckbox.checked) {
         this.selectedIds.add(e.employee_id);
@@ -302,11 +285,10 @@ const appEmployees = {
     this.updateBulkDeleteBar();
   },
 
-  // Cập nhật hiển thị thanh công cụ xóa hàng loạt
+  // Hiển thị / Ẩn thanh thao tác hàng loạt
   updateBulkDeleteBar() {
     let bar = document.getElementById('bulk-delete-bar');
     if (!bar) {
-      // Tự động chèn thanh công cụ vào phía trên bảng nếu chưa có trong HTML
       const tableControls = document.querySelector('.table-controls');
       if (tableControls && tableControls.parentNode) {
         bar = document.createElement('div');
@@ -336,7 +318,7 @@ const appEmployees = {
     }
   },
 
-  // Xử lý gửi API xóa hàng loạt
+  // Thực hiện xóa hàng loạt chuyển vào Thùng rác
   async bulkDeleteEmployees() {
     const employeeIds = Array.from(this.selectedIds);
     if (employeeIds.length === 0) return;
@@ -368,7 +350,7 @@ const appEmployees = {
       this.selectedIds.clear();
       this.updateBulkDeleteBar();
 
-      // Tải lại dữ liệu và làm mới giao diện
+      // Cập nhật lại dữ liệu
       await appData.init();
       appDashboard.init();
       if (typeof appTrash !== 'undefined') appTrash.render();
@@ -423,7 +405,7 @@ const appEmployees = {
     window.scrollTo({ top: 300, behavior: 'smooth' });
   },
 
-  // Open Full 8-Tab Detail Modal
+  // Các hàm chi tiết, thêm, sửa, xóa đơn lẻ...
   async openDetailModal(empId) {
     try {
       const res = await fetch(`/api/employees/${empId}`);
@@ -436,10 +418,7 @@ const appEmployees = {
       const { employee, contact, identity, emergency, education, salary, insurance, contracts, account } = json.data;
       this.selectedEmployee = employee;
 
-      // Header
       document.getElementById('detail-modal-emp-name').textContent = `Hồ Sơ Nhân Viên: ${employee.full_name} (${employee.employee_id})`;
-
-      // Tab 1: General
       document.getElementById('det-emp-id').textContent = employee.employee_id || '-';
       document.getElementById('det-time-code').textContent = employee.time_attendance_code || '-';
       document.getElementById('det-full-name').textContent = employee.full_name || '-';
@@ -464,7 +443,6 @@ const appEmployees = {
       document.getElementById('det-seniority').textContent = employee.seniority_text || '-';
       document.getElementById('det-other-certs').textContent = employee.other_certificates || (education && education[0] ? education[0].other_certificates : '') || 'Chứng chỉ An toàn Lao động';
 
-      // Tab 2: Contact
       document.getElementById('det-mobile').textContent = contact.mobile_phone || '-';
       document.getElementById('det-home-phone').textContent = contact.home_phone || '-';
       document.getElementById('det-work-email').textContent = contact.work_email || '-';
@@ -472,7 +450,6 @@ const appEmployees = {
       document.getElementById('det-perm-addr').textContent = contact.permanent_address_full || '-';
       document.getElementById('det-curr-addr').textContent = contact.current_address_full || '-';
 
-      // Tab 3: Identity
       document.getElementById('det-id-type').textContent = identity.doc_type || 'CCCD';
       document.getElementById('det-id-num').textContent = identity.id_number || '-';
       document.getElementById('det-id-date').textContent = utils.formatDate(identity.id_issue_date);
@@ -482,7 +459,6 @@ const appEmployees = {
       document.getElementById('det-passport-num').textContent = identity.passport_number || '-';
       document.getElementById('det-passport-date').textContent = utils.formatDate(identity.passport_issue_date);
 
-      // Tab 4: Emergency
       const emContainer = document.getElementById('det-emergency-container');
       if (emergency && emergency.length > 0) {
         emContainer.innerHTML = emergency.map(em => `
@@ -496,7 +472,6 @@ const appEmployees = {
         emContainer.innerHTML = `<div style="grid-column: 1 / -1; color: var(--text-muted); text-align: center; padding: 20px;">Chưa có thông tin người liên hệ khẩn cấp.</div>`;
       }
 
-      // Tab 5: Education
       const eduContainer = document.getElementById('det-education-container');
       if (education && education.length > 0) {
         eduContainer.innerHTML = education.map(ed => `
@@ -512,7 +487,6 @@ const appEmployees = {
         eduContainer.innerHTML = `<div style="grid-column: 1 / -1; color: var(--text-muted); text-align: center; padding: 20px;">Chưa có thông tin văn bằng / học vị.</div>`;
       }
 
-      // Tab 6: Salary
       document.getElementById('det-salary-grade').textContent = salary.salary_grade || '1';
       document.getElementById('det-base-salary').textContent = utils.formatCurrency(salary.base_salary);
       document.getElementById('det-total-salary').textContent = utils.formatCurrency(salary.total_salary);
@@ -521,7 +495,6 @@ const appEmployees = {
       document.getElementById('det-bank-name').textContent = salary.bank_name || '-';
       document.getElementById('det-bank-branch').textContent = salary.bank_branch || '-';
 
-      // Tab 7: Insurance
       document.getElementById('det-has-ins').textContent = insurance.has_insurance || 'Không tham gia';
       document.getElementById('det-bhxh-code').textContent = insurance.social_insurance_code || '-';
       document.getElementById('det-bhxh-book').textContent = insurance.social_insurance_book_no || '-';
@@ -530,7 +503,6 @@ const appEmployees = {
       document.getElementById('det-hospital').textContent = insurance.hospital_registered || '-';
       document.getElementById('det-union').textContent = insurance.union_member || 'Không';
 
-      // Tab 8: Contract & Account
       const firstContract = contracts && contracts.length > 0 ? contracts[0] : {};
       document.getElementById('det-contract-id').textContent = firstContract.contract_id || '-';
       document.getElementById('det-contract-type').textContent = firstContract.contract_type || employee.contract_type || 'Hợp đồng lao động';
@@ -539,10 +511,7 @@ const appEmployees = {
       document.getElementById('det-acc-role').textContent = account.role || 'USER';
       document.getElementById('det-acc-status').textContent = account.account_status || 'Đã kích hoạt';
 
-      // Reset to Tab 1
       document.querySelector('#modal-employee-detail .modal-tab-btn[data-tab="tab-general"]').click();
-
-      // Show modal
       document.getElementById('modal-employee-detail').classList.add('active');
     } catch (e) {
       console.error(e);
@@ -562,7 +531,6 @@ const appEmployees = {
     document.getElementById('form-emp-id').readOnly = false;
     document.getElementById('employee-crud-form').reset();
 
-    // Default values
     document.getElementById('form-gender').value = 'Nam';
     document.getElementById('form-ethnicity').value = 'Kinh';
     document.getElementById('form-religion').value = 'Không';
@@ -577,7 +545,6 @@ const appEmployees = {
     document.getElementById('form-education-level').value = 'Đại học';
     document.getElementById('form-emergency-relation').value = 'Vợ';
 
-    // Switch to Tab 1
     document.querySelector('.form-tab-btn[data-tab="form-tab-personal"]').click();
     document.getElementById('modal-employee-form').classList.add('active');
   },
@@ -600,7 +567,6 @@ const appEmployees = {
       document.getElementById('form-modal-title').textContent = `Chỉnh Sửa Hồ Sơ: ${employee.full_name} (${empId})`;
       document.getElementById('form-modal-icon').className = 'fa-solid fa-user-pen';
       
-      // Tab 1: Personal
       document.getElementById('form-emp-id').value = employee.employee_id || '';
       document.getElementById('form-emp-id').readOnly = true;
       document.getElementById('form-full-name').value = employee.full_name || '';
@@ -614,7 +580,6 @@ const appEmployees = {
       document.getElementById('form-children-count').value = employee.children_count !== undefined ? employee.children_count : 0;
       document.getElementById('form-tax-code').value = employee.tax_code || '';
 
-      // Tab 2: Job & Contract
       document.getElementById('form-dept-id').value = employee.department_id || '';
       document.getElementById('form-pos-id').value = employee.position_id || '';
       document.getElementById('form-job-rank').value = employee.job_rank || (salary.salary_grade ? `Cấp ${salary.salary_grade} - Kỹ sư Chính` : 'Cấp 3 - Chuyên viên / Nhân viên Nghiệp vụ');
@@ -627,7 +592,6 @@ const appEmployees = {
       document.getElementById('form-start-date').value = employee.start_date || employee.trial_start_date || '';
       document.getElementById('form-end-date').value = employee.end_date || firstContract.end_date || 'Không xác định';
 
-      // Tab 3: Contact, CCCD & Emergency
       document.getElementById('form-mobile').value = contact.mobile_phone || '';
       document.getElementById('form-email').value = contact.work_email || '';
       document.getElementById('form-personal-email').value = contact.personal_email || '';
@@ -641,7 +605,6 @@ const appEmployees = {
       document.getElementById('form-emergency-relation').value = firstEmerg.relationship || 'Vợ';
       document.getElementById('form-emergency-phone').value = firstEmerg.mobile_phone || '';
 
-      // Tab 4: Salary, Insurance & Education
       document.getElementById('form-salary').value = salary.base_salary || 0;
       document.getElementById('form-total-salary').value = salary.total_salary || salary.base_salary || 0;
       document.getElementById('form-bank-acc').value = salary.bank_account_number || '';
@@ -653,7 +616,6 @@ const appEmployees = {
       document.getElementById('form-major').value = firstEdu.major || '';
       document.getElementById('form-other-certs').value = employee.other_certificates || firstEdu.other_certificates || '';
 
-      // Switch to Tab 1
       document.querySelector('.form-tab-btn[data-tab="form-tab-personal"]').click();
       document.getElementById('modal-employee-form').classList.add('active');
     } catch (e) {

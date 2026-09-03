@@ -378,25 +378,29 @@
             <!-- Employee Data Table -->
             <div class="table-responsive">
               <table class="data-table" id="emp-main-table">
-                <thead>
-                  <tr>
-                    <th class="col-sticky-stt">STT</th>
-                    <th class="col-sticky-id">Mã NV</th>
-                    <th class="col-sticky-name">Họ và Tên</th>
-                    <th>Giới Tính</th>
-                    <th>Vị Trí Công Việc</th>
-                    <th>Đơn Vị Công Tác</th>
-                    <th>SĐT Di Động</th>
-                    <th>Email Công Việc</th>
-                    <th>Tính Chất</th>
-                    <th>Trạng Thái</th>
-                    <th class="col-sticky-action">Hành Động</th>
-                  </tr>
-                </thead>
-                <tbody id="employees-tbody">
-                  <!-- Injected via JavaScript -->
-                </tbody>
-              </table>
+  <thead>
+    <tr>
+      <!-- Thêm cột checkbox chọn tất cả ở đây -->
+      <th style="width: 40px; text-align: center; position: sticky; left: 0; background: #F8FAFC; z-index: 6;">
+        <input type="checkbox" id="select-all-emp" onchange="appEmployees.toggleSelectAll(this)" title="Chọn tất cả trang này">
+      </th>
+      <th class="col-sticky-stt">STT</th>
+      <th class="col-sticky-id">Mã NV</th>
+      <th class="col-sticky-name">Họ và Tên</th>
+      <th>Giới Tính</th>
+      <th>Vị Trí Công Việc</th>
+      <th>Đơn Vị Công Tác</th>
+      <th>SĐT Di Động</th>
+      <th>Email Công Việc</th>
+      <th>Tính Chất</th>
+      <th>Trạng Thái</th>
+      <th class="col-sticky-action">Hành Động</th>
+    </tr>
+  </thead>
+  <tbody id="employees-tbody">
+    <!-- Injected via JavaScript -->
+  </tbody>
+</table>
             </div>
 
             <!-- Pagination Bar -->
