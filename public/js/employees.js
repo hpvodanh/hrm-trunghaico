@@ -1,5 +1,5 @@
 // ==========================================================================
-// EMPLOYEE MANAGEMENT MODULE
+// EMPLOYEE MANAGEMENT MODULE (Cập nhật tính năng Xóa hàng loạt)
 // ==========================================================================
 
 const appEmployees = {
@@ -8,6 +8,7 @@ const appEmployees = {
   pageSize: 25,
   filteredList: [],
   selectedEmployee: null,
+  selectedIds: new Set(), // Quản lý danh sách ID nhân viên được tích chọn hàng loạt
 
   init() {
     this.populateFilterDropdowns();
@@ -198,6 +199,7 @@ const appEmployees = {
 
     this.renderTable();
     this.renderPagination();
+    this.updateBulkDeleteBar();
   },
 
   renderTable() {
@@ -205,7 +207,7 @@ const appEmployees = {
     if (!tbody) return;
 
     if (this.filteredList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align: center; padding: 32px; color: var(--text-muted);">
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; padding: 32px; color: var(--text-muted);">
         <i class="fa-solid fa-folder-open" style="font-size: 32px; margin-bottom: 8px; display: block;"></i>
         Không tìm thấy nhân sự phù hợp với điều kiện lọc.
       </td></tr>`;
@@ -221,6 +223,8 @@ const appEmployees = {
     tbody.innerHTML = paginated.map((e, index) => {
       const stt = start + index + 1;
       const c = contactMap[e.employee_id] || {};
+      const isChecked = this.selectedIds.has(e.employee_id);
+      
       const statusBadge = e.employment_status === 'Đang làm việc'
         ? '<span class="badge badge-active"><i class="fa-solid fa-check"></i> Đang làm việc</span>'
         : '<span class="badge badge-resigned"><i class="fa-solid fa-xmark"></i> Đã nghỉ việc</span>';
@@ -232,7 +236,10 @@ const appEmployees = {
         : `<span class="badge" style="background:#F1F5F9; color:#475569;">${e.labor_nature || '-'}</span>`;
 
       return `
-        <tr>
+        <tr class="${isChecked ? 'row-selected' : ''}">
+          <td style="text-align: center; width: 40px;">
+            <input type="checkbox" class="emp-checkbox" value="${e.employee_id}" ${isChecked ? 'checked' : ''} onchange="appEmployees.toggleRowSelect('${e.employee_id}', this.checked)">
+          </td>
           <td class="col-sticky-stt" style="color: var(--text-muted); font-size: 12px; font-weight: 500;">${stt}</td>
           <td class="col-sticky-id"><strong style="color: var(--primary-navy); cursor: pointer;" onclick="appEmployees.openDetailModal('${e.employee_id}')">${e.employee_id}</strong></td>
           <td class="col-sticky-name">
@@ -264,6 +271,112 @@ const appEmployees = {
         </tr>
       `;
     }).join('');
+
+    // Check trạng thái của checkbox "Chọn tất cả" trên header bảng nếu có
+    const selectAllCheck = document.getElementById('select-all-emp');
+    if (selectAllCheck && paginated.length > 0) {
+      selectAllCheck.checked = paginated.every(e => this.selectedIds.has(e.employee_id));
+    }
+  },
+
+  // Chọn / Bỏ chọn tất cả trang hiện tại
+  toggleSelectAll(masterCheckbox) {
+    const paginated = this.filteredList.slice((this.currentPage - 1) * this.pageSize, this.currentPage * this.pageSize);
+    paginated.forEach(e => {
+      if (masterCheckbox.checked) {
+        this.selectedIds.add(e.employee_id);
+      } else {
+        this.selectedIds.delete(e.employee_id);
+      }
+    });
+    this.renderTable();
+    this.updateBulkDeleteBar();
+  },
+
+  toggleRowSelect(empId, isChecked) {
+    if (isChecked) {
+      this.selectedIds.add(empId);
+    } else {
+      this.selectedIds.delete(empId);
+    }
+    this.updateBulkDeleteBar();
+  },
+
+  // Cập nhật hiển thị thanh công cụ xóa hàng loạt
+  updateBulkDeleteBar() {
+    let bar = document.getElementById('bulk-delete-bar');
+    if (!bar) {
+      // Tự động chèn thanh công cụ vào phía trên bảng nếu chưa có trong HTML
+      const tableControls = document.querySelector('.table-controls');
+      if (tableControls && tableControls.parentNode) {
+        bar = document.createElement('div');
+        bar.id = 'bulk-delete-bar';
+        bar.style.cssText = 'display: none; align-items: center; justify-content: space-between; background: #FEF2F2; border: 1px solid #FECACA; padding: 8px 14px; border-radius: 4px; margin-bottom: 12px;';
+        bar.innerHTML = `
+          <span style="font-size: 12.5px; font-weight: 600; color: #991B1B;">
+            Đã chọn <strong id="selected-count">0</strong> nhân sự
+          </span>
+          <button type="button" class="btn btn-sm" onclick="appEmployees.bulkDeleteEmployees()" style="background: #DC2626; color: #FFFFFF; border: none; font-weight: 600; cursor: pointer;">
+            <i class="fa-solid fa-trash-can"></i> Chuyển các mục đã chọn vào Thùng rác
+          </button>
+        `;
+        tableControls.parentNode.insertBefore(bar, tableControls.nextSibling);
+      }
+    }
+
+    const countSpan = document.getElementById('selected-count');
+    if (bar && countSpan) {
+      const count = this.selectedIds.size;
+      countSpan.textContent = count;
+      if (count > 0) {
+        bar.style.display = 'flex';
+      } else {
+        bar.style.display = 'none';
+      }
+    }
+  },
+
+  // Xử lý gửi API xóa hàng loạt
+  async bulkDeleteEmployees() {
+    const employeeIds = Array.from(this.selectedIds);
+    if (employeeIds.length === 0) return;
+
+    if (!confirm(`Bạn có chắc chắn muốn chuyển ${employeeIds.length} nhân sự đã chọn vào Thùng rác không?`)) {
+      return;
+    }
+
+    try {
+      let successCount = 0;
+      const user = (typeof appAuth !== 'undefined' && appAuth.currentUser) ? appAuth.currentUser : { employee_id: 'TH-1948', full_name: 'Huỳnh Thanh Long', role: 'ADMIN' };
+
+      for (const empId of employeeIds) {
+        const res = await fetch(`/api/employees/${empId}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            operator_id: user.employee_id,
+            operator_name: user.full_name,
+            operator_role: user.role
+          })
+        });
+        const json = await res.json();
+        if (json.success) successCount++;
+      }
+
+      utils.showToast(`Đã chuyển thành công ${successCount}/${employeeIds.length} nhân sự vào Thùng rác!`, 'success');
+      
+      this.selectedIds.clear();
+      this.updateBulkDeleteBar();
+
+      // Tải lại dữ liệu và làm mới giao diện
+      await appData.init();
+      appDashboard.init();
+      if (typeof appTrash !== 'undefined') appTrash.render();
+      this.applyFilters();
+    } catch (err) {
+      console.error(err);
+      utils.showToast('Lỗi khi thực hiện xóa hàng loạt: ' + err.message, 'error');
+    }
   },
 
   renderPagination() {
