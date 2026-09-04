@@ -1,6 +1,6 @@
 {
   "keyFilePath": "./config/service-account.json",
-  "spreadsheetId": "1yv99BPOQmCokgw2UPRrMeErrDRgo9STgOoGLLYCjAIA",
+  "spreadsheetId": "1yv99BPOQmCokgw2UPRrMeErrDRgo9STgOoGLLYCjAlA",
   "autoSyncOnSave": true,
   "syncIntervalMinutes": 0,
   "is_setup_completed": true
