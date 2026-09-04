@@ -9,6 +9,7 @@ const appEmployees = {
   filteredList: [],
   selectedEmployee: null,
   selectedIds: new Set(), // Quản lý danh sách ID nhân viên được tích chọn hàng loạt
+  isSelectMode: false, // Chế độ chọn: mặc định ẩn các ô tích, chỉ hiện khi bấm "Chọn"
 
   init() {
     this.populateFilterDropdowns();
@@ -220,7 +221,7 @@ const appEmployees = {
 
       return `
         <tr class="${isChecked ? 'row-selected' : ''}">
-          <td style="text-align: center; width: 40px; background: #FFFFFF; position: sticky; left: 0; z-index: 4;">
+          <td class="col-select">
             <input type="checkbox" class="emp-checkbox" value="${e.employee_id}" ${isChecked ? 'checked' : ''} onchange="appEmployees.toggleRowSelect('${e.employee_id}', this.checked)">
           </td>
           <td class="col-sticky-stt" style="color: var(--text-muted); font-size: 12px; font-weight: 500;">${stt}</td>
@@ -262,8 +263,111 @@ const appEmployees = {
     }
   },
 
+  // Đóng mở Menu Hành Động
+  toggleActionMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('menu-emp-actions');
+    if (!menu) return;
+    const isShowing = menu.style.display === 'block';
+    menu.style.display = isShowing ? 'none' : 'block';
+
+    if (!isShowing) {
+      const closeHandler = (e) => {
+        if (!menu.contains(e.target) && !document.getElementById('btn-emp-action-menu')?.contains(e.target)) {
+          menu.style.display = 'none';
+          document.removeEventListener('click', closeHandler);
+        }
+      };
+      setTimeout(() => document.addEventListener('click', closeHandler), 10);
+    }
+  },
+
+  closeActionMenu() {
+    const menu = document.getElementById('menu-emp-actions');
+    if (menu) menu.style.display = 'none';
+  },
+
+  // Bật chế độ chọn (Hiện các ô tích trước tên nhân sự)
+  enableSelectMode(selectAll = false) {
+    this.closeActionMenu();
+    this.isSelectMode = true;
+
+    const table = document.getElementById('emp-main-table');
+    if (table) table.classList.add('selection-active');
+
+    if (selectAll) {
+      const start = (this.currentPage - 1) * this.pageSize;
+      const paginated = this.filteredList.slice(start, start + this.pageSize);
+      paginated.forEach(e => this.selectedIds.add(e.employee_id));
+    }
+
+    this.renderTable();
+    this.updateBulkDeleteBar();
+    utils.showToast(selectAll ? 'Đã hiện ô tích và chọn tất cả trang này' : 'Đã hiện các ô tích chọn nhân sự', 'info');
+  },
+
+  // Tắt chế độ chọn (Ẩn các ô tích)
+  disableSelectMode() {
+    this.isSelectMode = false;
+    this.selectedIds.clear();
+
+    const table = document.getElementById('emp-main-table');
+    if (table) table.classList.remove('selection-active');
+
+    const selectAllCheck = document.getElementById('select-all-emp');
+    if (selectAllCheck) selectAllCheck.checked = false;
+
+    this.renderTable();
+    this.updateBulkDeleteBar();
+  },
+
+  // Chọn toàn bộ nhân sự theo bộ lọc
+  selectAllFiltered() {
+    this.closeActionMenu();
+    this.isSelectMode = true;
+
+    const table = document.getElementById('emp-main-table');
+    if (table) table.classList.add('selection-active');
+
+    this.filteredList.forEach(e => this.selectedIds.add(e.employee_id));
+
+    this.renderTable();
+    this.updateBulkDeleteBar();
+    utils.showToast(`Đã chọn toàn bộ ${this.selectedIds.size} nhân sự trong danh sách lọc!`, 'success');
+  },
+
   // Chọn / Bỏ chọn toàn bộ nhân sự trong trang hiện tại
+  toggleSelectAllCurrentPage() {
+    const start = (this.currentPage - 1) * this.pageSize;
+    const paginated = this.filteredList.slice(start, start + this.pageSize);
+    const allSelected = paginated.every(e => this.selectedIds.has(e.employee_id));
+
+    paginated.forEach(e => {
+      if (allSelected) {
+        this.selectedIds.delete(e.employee_id);
+      } else {
+        this.selectedIds.add(e.employee_id);
+      }
+    });
+
+    this.renderTable();
+    this.updateBulkDeleteBar();
+  },
+
+  // Bỏ chọn tất cả
+  clearSelection() {
+    this.selectedIds.clear();
+    const selectAllCheck = document.getElementById('select-all-emp');
+    if (selectAllCheck) selectAllCheck.checked = false;
+    this.renderTable();
+    this.updateBulkDeleteBar();
+  },
+
+  // Chọn / Bỏ chọn qua master checkbox ở tiêu đề bảng
   toggleSelectAll(masterCheckbox) {
+    if (!this.isSelectMode) {
+      this.enableSelectMode(false);
+    }
     const start = (this.currentPage - 1) * this.pageSize;
     const paginated = this.filteredList.slice(start, start + this.pageSize);
     paginated.forEach(e => {
@@ -286,7 +390,7 @@ const appEmployees = {
     this.updateBulkDeleteBar();
   },
 
-  // Hiển thị / Ẩn thanh thao tác hàng loạt
+  // Hiển thị / Cập nhật thanh thao tác hàng loạt
   updateBulkDeleteBar() {
     let bar = document.getElementById('bulk-delete-bar');
     if (!bar) {
@@ -294,29 +398,54 @@ const appEmployees = {
       if (tableControls && tableControls.parentNode) {
         bar = document.createElement('div');
         bar.id = 'bulk-delete-bar';
-        bar.style.cssText = 'display: none; align-items: center; justify-content: space-between; background: #FEF2F2; border: 1px solid #FECACA; padding: 8px 14px; border-radius: 4px; margin-bottom: 12px;';
-        bar.innerHTML = `
-          <span style="font-size: 12.5px; font-weight: 600; color: #991B1B;">
-            Đã chọn <strong id="selected-count">0</strong> nhân sự
-          </span>
-          <button type="button" class="btn btn-sm" onclick="appEmployees.bulkDeleteEmployees()" style="background: #DC2626; color: #FFFFFF; border: none; font-weight: 600; cursor: pointer;">
-            <i class="fa-solid fa-trash-can"></i> Chuyển các mục đã chọn vào Thùng rác
-          </button>
-        `;
+        bar.className = 'bulk-delete-toolbar';
         tableControls.parentNode.insertBefore(bar, tableControls.nextSibling);
       }
     }
 
-    const countSpan = document.getElementById('selected-count');
-    if (bar && countSpan) {
-      const count = this.selectedIds.size;
-      countSpan.textContent = count;
-      if (count > 0) {
-        bar.style.display = 'flex';
-      } else {
-        bar.style.display = 'none';
-      }
+    if (!bar) return;
+
+    if (!this.isSelectMode) {
+      bar.style.display = 'none';
+      return;
     }
+
+    const start = (this.currentPage - 1) * this.pageSize;
+    const paginated = this.filteredList.slice(start, start + this.pageSize);
+    const count = this.selectedIds.size;
+    const pageCount = paginated.length;
+    const totalCount = this.filteredList.length;
+
+    bar.style.display = 'flex';
+    bar.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #2563EB; color: #FFFFFF; font-size: 11px;">
+          <i class="fa-solid fa-check"></i>
+        </span>
+        <span style="font-size: 12.5px; font-weight: 600; color: #1E3A8A;">
+          Đã chọn: <strong style="color: #DC2626; font-size: 14px;">${count}</strong> / ${totalCount} nhân sự
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="appEmployees.toggleSelectAllCurrentPage()" style="font-size: 11.5px;">
+          <i class="fa-solid fa-check-double" style="color: #10B981;"></i> Chọn trang này (${pageCount})
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="appEmployees.selectAllFiltered()" style="font-size: 11.5px;">
+          <i class="fa-solid fa-users-viewfinder" style="color: #2563EB;"></i> Chọn tất cả (${totalCount})
+        </button>
+        ${count > 0 ? `
+          <button type="button" class="btn btn-sm btn-secondary" onclick="appEmployees.clearSelection()" style="font-size: 11.5px;">
+            <i class="fa-solid fa-rotate-left"></i> Bỏ chọn
+          </button>
+        ` : ''}
+        <button type="button" class="btn btn-sm" onclick="appEmployees.bulkDeleteEmployees()" style="background: #DC2626; color: #FFFFFF; border: none; font-size: 11.5px; font-weight: 600; padding: 4px 10px; cursor: pointer; ${count === 0 ? 'opacity: 0.5; pointer-events: none;' : ''}">
+          <i class="fa-solid fa-trash-can"></i> Xóa đã chọn (${count})
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="appEmployees.disableSelectMode()" style="font-size: 11.5px; color: #64748B;" title="Ẩn ô tích & thoát">
+          <i class="fa-solid fa-xmark"></i> Hủy
+        </button>
+      </div>
+    `;
   },
 
   // Thực hiện xóa hàng loạt chuyển vào Thùng rác và render lại ngay lập tức
@@ -367,7 +496,7 @@ const appEmployees = {
       
       // Xóa sạch danh sách ID đã chọn và ẩn thanh công cụ
       this.selectedIds.clear();
-      this.updateBulkDeleteBar();
+      this.disableSelectMode();
 
       // Đồng bộ lại dữ liệu từ server và cập nhật giao diện ngay lập tức
       await appData.init();

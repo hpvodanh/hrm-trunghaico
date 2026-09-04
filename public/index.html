@@ -365,7 +365,38 @@
                 </button>
               </div>
 
-              <div style="display: flex; gap: 8px;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <!-- Nút & Menu Hành Động (Chọn / Chọn tất cả để xóa nhanh) -->
+                <div class="dropdown-action-wrapper" style="position: relative;">
+                  <button class="btn btn-secondary btn-sm" id="btn-emp-action-menu" onclick="appEmployees.toggleActionMenu(event)" title="Thao tác & Hành động chọn xóa nhanh">
+                    <i class="fa-solid fa-bolt" style="color: var(--primary-navy);"></i>
+                    <span>Hành động</span>
+                    <i class="fa-solid fa-chevron-down" style="font-size: 10px; margin-left: 4px;"></i>
+                  </button>
+                  <div class="dropdown-menu-actions" id="menu-emp-actions" style="display: none; position: absolute; right: 0; top: calc(100% + 4px); background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15); min-width: 220px; z-index: 100; padding: 6px 0;">
+                    <div style="padding: 6px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Thao tác chọn nhanh
+                    </div>
+                    <a href="javascript:void(0)" onclick="appEmployees.enableSelectMode(false)">
+                      <i class="fa-regular fa-square-check" style="color: var(--primary-navy); width: 18px;"></i>
+                      <span>Chọn nhân sự (Hiện ô tích)</span>
+                    </a>
+                    <a href="javascript:void(0)" onclick="appEmployees.enableSelectMode(true)">
+                      <i class="fa-solid fa-check-double" style="color: #10B981; width: 18px;"></i>
+                      <span>Chọn tất cả trang này</span>
+                    </a>
+                    <a href="javascript:void(0)" onclick="appEmployees.selectAllFiltered()">
+                      <i class="fa-solid fa-users-viewfinder" style="color: #2563EB; width: 18px;"></i>
+                      <span>Chọn tất cả danh sách lọc</span>
+                    </a>
+                    <div class="menu-divider"></div>
+                    <a href="javascript:void(0)" class="menu-item-danger" onclick="appEmployees.bulkDeleteEmployees()">
+                      <i class="fa-solid fa-trash-can" style="width: 18px;"></i>
+                      <span>Xóa các nhân sự đã chọn</span>
+                    </a>
+                  </div>
+                </div>
+
                 <button class="btn btn-outline-navy btn-sm" id="btn-open-import-emp" onclick="appImport.openModal()" title="Nhập danh sách nhân sự hàng loạt từ file Excel">
                   <i class="fa-solid fa-file-import" style="color: var(--primary-navy);"></i> Nhập Excel
                 </button>
@@ -380,8 +411,7 @@
               <table class="data-table" id="emp-main-table">
   <thead>
     <tr>
-      <!-- Thêm cột checkbox chọn tất cả ở đây -->
-      <th style="width: 40px; text-align: center; position: sticky; left: 0; background: #F8FAFC; z-index: 6;">
+      <th class="col-select" title="Chọn tất cả">
         <input type="checkbox" id="select-all-emp" onchange="appEmployees.toggleSelectAll(this)" title="Chọn tất cả trang này">
       </th>
       <th class="col-sticky-stt">STT</th>
