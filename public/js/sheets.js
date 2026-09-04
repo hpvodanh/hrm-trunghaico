@@ -80,6 +80,12 @@ const appSheets = (() => {
                 `;
             } else {
                 statusBox.className = 'sheets-status-card warning';
+                const rawErrorHtml = connectionStatus?.error && connectionStatus.error !== connectionStatus.message ? `
+                    <div style="font-size: 10.5px; color: #78350F; background: rgba(0,0,0,0.05); padding: 6px 10px; border-radius: 4px; margin-top: 6px; word-break: break-all; font-family: monospace;">
+                        <i class="fa-solid fa-circle-info"></i> Chi tiết từ Google API: ${connectionStatus.error}
+                    </div>
+                ` : '';
+
                 statusBox.innerHTML = `
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
                         <i class="fa-solid fa-triangle-exclamation" style="color: #D97706; font-size: 18px;"></i>
@@ -88,6 +94,7 @@ const appSheets = (() => {
                     <div style="font-size: 11.5px; color: #B45309; line-height: 1.4;">
                         ${connectionStatus?.message || 'Vui lòng dán Link hoặc ID của Google Trang tính và nhấn "Lưu & Kết nối".'}
                     </div>
+                    ${rawErrorHtml}
                     ${emailHtml}
                 `;
             }
@@ -112,14 +119,20 @@ const appSheets = (() => {
     async function saveConfig() {
         const inputId = document.getElementById('sheets-spreadsheet-id-input');
         const autoSyncCheck = document.getElementById('sheets-auto-sync-check');
-        const btn = document.getElementById('btn-sheets-save');
+        const btn = document.getElementById('btn-save-sheets-config') || document.getElementById('btn-sheets-save');
 
-        const spreadsheetId = inputId ? inputId.value.trim() : '';
+        let rawId = inputId ? inputId.value.trim() : '';
+        const match = rawId.match(/\/d\/([a-zA-Z0-9-_]+)/);
+        const spreadsheetId = match ? match[1] : rawId;
+        if (match && inputId) {
+            inputId.value = spreadsheetId;
+        }
+
         const autoSyncOnSave = autoSyncCheck ? autoSyncCheck.checked : true;
 
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kiểm tra...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang kết nối...';
         }
 
         try {
