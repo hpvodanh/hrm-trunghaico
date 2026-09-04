@@ -1,13 +1,23 @@
 const { google } = require('googleapis');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'config', 'sheets.config.json');
+const TMP_CONFIG_PATH = path.join(os.tmpdir(), 'sheets.config.json');
+
+let inMemoryConfig = null;
+let activeCredentials = null;
+
+function setActiveCredentials(creds) {
+    if (!creds) return;
+    activeCredentials = typeof creds === 'string' ? JSON.parse(creds) : creds;
+}
 
 // Helper to get config
 function getConfig() {
     let baseConfig = {
-        keyFilePath: './make-472708-52c73f3ee34b.json',
+        keyFilePath: './config/hrm-trunghaico-507602-fd746f1db385.json',
         spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID || '',
         autoSyncOnSave: true
     };
@@ -21,6 +31,17 @@ function getConfig() {
         console.error('Error reading sheets config:', e.message);
     }
 
+    try {
+        if (fs.existsSync(TMP_CONFIG_PATH)) {
+            const tmpCfg = JSON.parse(fs.readFileSync(TMP_CONFIG_PATH, 'utf-8'));
+            baseConfig = { ...baseConfig, ...tmpCfg };
+        }
+    } catch (e) {}
+
+    if (inMemoryConfig) {
+        baseConfig = { ...baseConfig, ...inMemoryConfig };
+    }
+
     if (process.env.GOOGLE_SPREADSHEET_ID) {
         baseConfig.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
     }
@@ -30,22 +51,72 @@ function getConfig() {
 
 // Helper to save config
 function saveConfig(cfg) {
+    inMemoryConfig = { ...(inMemoryConfig || getConfig()), ...cfg };
+    if (cfg && cfg.spreadsheetId) {
+        process.env.GOOGLE_SPREADSHEET_ID = cfg.spreadsheetId;
+    }
+
+    let saved = false;
     try {
         const dir = path.dirname(CONFIG_PATH);
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         const current = getConfig();
         const updated = { ...current, ...cfg };
         fs.writeFileSync(CONFIG_PATH, JSON.stringify(updated, null, 2), 'utf-8');
-        return true;
+        saved = true;
     } catch (e) {
-        console.error('Error saving sheets config:', e.message);
-        return false;
+        // Read-only filesystem (e.g. Vercel)
+        console.warn('Config path read-only, attempting fallback to os.tmpdir():', e.message);
     }
+
+    try {
+        const current = getConfig();
+        const updated = { ...current, ...cfg };
+        fs.writeFileSync(TMP_CONFIG_PATH, JSON.stringify(updated, null, 2), 'utf-8');
+        saved = true;
+    } catch (e) {}
+
+    return saved || true;
 }
 
 // Get Google Sheets API Client
-function getSheetsClient() {
-    // 1. Check for Cloud / Vercel Environment Variable first
+function getSheetsClient(customCredentials) {
+    // 1. Check custom credentials argument
+    if (customCredentials) {
+        try {
+            const credentials = typeof customCredentials === 'string'
+                ? JSON.parse(customCredentials)
+                : customCredentials;
+            const auth = new google.auth.GoogleAuth({
+                credentials,
+                scopes: [
+                    'https://www.googleapis.com/auth/spreadsheets',
+                    'https://www.googleapis.com/auth/drive'
+                ]
+            });
+            return google.sheets({ version: 'v4', auth });
+        } catch (err) {
+            console.error('Error with customCredentials:', err.message);
+        }
+    }
+
+    // 2. Check active in-memory credentials
+    if (activeCredentials) {
+        try {
+            const auth = new google.auth.GoogleAuth({
+                credentials: activeCredentials,
+                scopes: [
+                    'https://www.googleapis.com/auth/spreadsheets',
+                    'https://www.googleapis.com/auth/drive'
+                ]
+            });
+            return google.sheets({ version: 'v4', auth });
+        } catch (err) {
+            console.error('Error with activeCredentials:', err.message);
+        }
+    }
+
+    // 3. Check for Cloud / Vercel Environment Variable
     if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
         try {
             const credentials = typeof process.env.GOOGLE_SERVICE_ACCOUNT_JSON === 'string'
@@ -65,19 +136,45 @@ function getSheetsClient() {
         }
     }
 
-    // 2. Check for local key file on disk
+    // 4. Check for local key file on disk
     const cfg = getConfig();
-    let keyFile = cfg.keyFilePath;
-    if (!path.isAbsolute(keyFile)) {
-        keyFile = path.join(__dirname, '..', keyFile);
+    const candidatePaths = [];
+
+    if (cfg.keyFilePath) {
+        if (path.isAbsolute(cfg.keyFilePath)) {
+            candidatePaths.push(cfg.keyFilePath);
+        } else {
+            candidatePaths.push(path.join(__dirname, '..', cfg.keyFilePath));
+        }
     }
 
-    if (!fs.existsSync(keyFile)) {
-        throw new Error(`Khóa Service Account không tồn tại tại: ${keyFile}. Vui lòng thiết lập biến môi trường GOOGLE_SERVICE_ACCOUNT_JSON trên Vercel hoặc đặt file key tại máy chủ.`);
+    // Standard fallback locations
+    candidatePaths.push(path.join(os.tmpdir(), 'service-account.json'));
+    candidatePaths.push(path.join(__dirname, '..', 'config', 'hrm-trunghaico-507602-fd746f1db385.json'));
+    candidatePaths.push(path.join(__dirname, '..', 'config', 'service-account.json'));
+    candidatePaths.push(path.join(__dirname, '..', 'hrm-trunghaico-507602-fd746f1db385.json'));
+
+    // Scan config/ directory for any service account json file
+    try {
+        const configDir = path.join(__dirname, '..', 'config');
+        if (fs.existsSync(configDir)) {
+            const files = fs.readdirSync(configDir);
+            for (const file of files) {
+                if (file.endsWith('.json') && file !== 'sheets.config.json') {
+                    candidatePaths.push(path.join(configDir, file));
+                }
+            }
+        }
+    } catch (e) {}
+
+    const foundKeyFile = candidatePaths.find(p => fs.existsSync(p));
+
+    if (!foundKeyFile) {
+        throw new Error('Khóa Service Account không tồn tại. Vui lòng hoàn tất Setup Wizard hoặc thiết lập biến môi trường GOOGLE_SERVICE_ACCOUNT_JSON trên Vercel.');
     }
 
     const auth = new google.auth.GoogleAuth({
-        keyFile,
+        keyFile: foundKeyFile,
         scopes: [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
@@ -141,6 +238,12 @@ async function testConnectionWithCredentials(credentials, spreadsheetId) {
         const sheets = google.sheets({ version: 'v4', auth });
         const res = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId.trim() });
         const sheetList = (res.data.sheets || []).map(s => s.properties.title);
+
+        // Cache valid credentials in memory
+        setActiveCredentials(parsedCreds);
+        process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(parsedCreds);
+        process.env.GOOGLE_SPREADSHEET_ID = spreadsheetId.trim();
+
         return {
             success: true,
             title: res.data.properties.title,
@@ -185,12 +288,12 @@ async function ensureSheets(sheets, spreadsheetId, requiredNames) {
 }
 
 // Export a single table to Google Sheet
-async function exportTableToGoogleSheets(tableName, rows, customSpreadsheetId) {
+async function exportTableToGoogleSheets(tableName, rows, customSpreadsheetId, customCredentials) {
     const cfg = getConfig();
     const spreadsheetId = customSpreadsheetId || cfg.spreadsheetId;
     if (!spreadsheetId) return false;
 
-    const sheets = getSheetsClient();
+    const sheets = getSheetsClient(customCredentials);
     await ensureSheets(sheets, spreadsheetId, [tableName]);
 
     let headers = [];
@@ -230,14 +333,14 @@ async function exportTableToGoogleSheets(tableName, rows, customSpreadsheetId) {
 }
 
 // Export ALL tables from local DB to Google Sheets
-async function exportAllToGoogleSheets(db, customSpreadsheetId) {
+async function exportAllToGoogleSheets(db, customSpreadsheetId, customCredentials) {
     const cfg = getConfig();
     const spreadsheetId = customSpreadsheetId || cfg.spreadsheetId;
     if (!spreadsheetId) {
         throw new Error('Chưa cấu hình Spreadsheet ID');
     }
 
-    const sheets = getSheetsClient();
+    const sheets = getSheetsClient(customCredentials);
     const tableNames = Object.keys(db.tables || {});
     await ensureSheets(sheets, spreadsheetId, tableNames);
 
@@ -247,7 +350,7 @@ async function exportAllToGoogleSheets(db, customSpreadsheetId) {
     for (const tableName of tableNames) {
         const rows = db.tables[tableName] || [];
         try {
-            await exportTableToGoogleSheets(tableName, rows, spreadsheetId);
+            await exportTableToGoogleSheets(tableName, rows, spreadsheetId, customCredentials);
             results.push({ table: tableName, rows: rows.length, success: true });
         } catch (err) {
             console.error(`[Google Sheets] Lỗi đồng bộ bảng "${tableName}":`, err.message);
@@ -259,14 +362,14 @@ async function exportAllToGoogleSheets(db, customSpreadsheetId) {
 }
 
 // Import ALL tables from Google Sheets into local format
-async function importAllFromGoogleSheets(customSpreadsheetId) {
+async function importAllFromGoogleSheets(customSpreadsheetId, customCredentials) {
     const cfg = getConfig();
     const spreadsheetId = customSpreadsheetId || cfg.spreadsheetId;
     if (!spreadsheetId) {
         throw new Error('Chưa cấu hình Spreadsheet ID');
     }
 
-    const sheets = getSheetsClient();
+    const sheets = getSheetsClient(customCredentials);
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const sheetTitles = (meta.data.sheets || []).map(s => s.properties.title);
 
@@ -329,6 +432,7 @@ function triggerBackgroundSync(db) {
 module.exports = {
     getConfig,
     saveConfig,
+    setActiveCredentials,
     testConnection,
     testConnectionWithCredentials,
     exportTableToGoogleSheets,
