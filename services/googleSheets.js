@@ -255,12 +255,42 @@ async function testConnection(customSpreadsheetId) {
 
     try {
         const sheets = getSheetsClient();
-        const res = await sheets.spreadsheets.get({ spreadsheetId });
+        let currentId = spreadsheetId;
+        let res;
+
+        try {
+            res = await sheets.spreadsheets.get({ spreadsheetId: currentId });
+        } catch (initialErr) {
+            // If not found, check if it's the common I vs l character confusion
+            if (initialErr.message.includes('not found') || initialErr.message.includes('permission')) {
+                let altId = null;
+                if (currentId.endsWith('CjAIA')) {
+                    altId = currentId.slice(0, -5) + 'CjAlA';
+                } else if (currentId.endsWith('CjAlA')) {
+                    altId = currentId.slice(0, -5) + 'CjAIA';
+                }
+
+                if (altId) {
+                    try {
+                        res = await sheets.spreadsheets.get({ spreadsheetId: altId });
+                        currentId = altId;
+                        saveConfig({ spreadsheetId: altId });
+                    } catch (altErr) {
+                        throw initialErr;
+                    }
+                } else {
+                    throw initialErr;
+                }
+            } else {
+                throw initialErr;
+            }
+        }
+
         const sheetList = (res.data.sheets || []).map(s => s.properties.title);
         return {
             success: true,
             title: res.data.properties.title,
-            spreadsheetId,
+            spreadsheetId: currentId,
             sheets: sheetList,
             serviceAccountEmail: saInfo?.email || '',
             message: `Đã kết nối thành công tới "${res.data.properties.title}" (${sheetList.length} tabs)`
