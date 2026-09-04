@@ -538,6 +538,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        if (appData.removeDeletedId) appData.removeDeletedId(empId);
         utils.showToast(json.message || `Đã khôi phục thành công ${empId}`, 'success');
         this.hidePopover();
         this.selectedIds.delete(empId);
@@ -580,6 +581,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        if (appData.purgeDeletedId) appData.purgeDeletedId(empId);
         utils.showToast(json.message || `Đã xóa vĩnh viễn ${empId}`, 'success');
         this.hidePopover();
         this.selectedIds.delete(empId);
@@ -623,6 +625,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        if (appData.removeDeletedId) ids.forEach(id => appData.removeDeletedId(id));
         utils.showToast(json.message || `Đã khôi phục thành công ${ids.length} nhân sự`, 'success');
         this.selectedIds.clear();
         await appData.init();
@@ -659,6 +662,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        if (appData.purgeDeletedId) ids.forEach(id => appData.purgeDeletedId(id));
         utils.showToast(json.message || `Đã xóa vĩnh viễn ${ids.length} nhân sự`, 'success');
         this.selectedIds.clear();
         await appData.init();
@@ -691,6 +695,8 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        if (appData.purgeDeletedId) (this.trashList || []).forEach(item => appData.purgeDeletedId(item.employee_id));
+        if (appData.clearLocalTrash) appData.clearLocalTrash();
         utils.showToast(json.message || 'Đã dọn sạch toàn bộ Thùng rác', 'success');
         this.selectedIds.clear();
         await appData.init();

@@ -343,7 +343,24 @@ const appEmployees = {
           })
         });
         const json = await res.json();
-        if (json.success) successCount++;
+        if (json.success) {
+          successCount++;
+          const emp = appData.empMap[empId];
+          const trashEntry = {
+            trash_id: json.trash_id || `TRASH-${empId}-${Date.now()}`,
+            employee_id: empId,
+            full_name: emp ? emp.full_name : empId,
+            gender: emp ? emp.gender : '',
+            department_id: emp ? emp.department_id : '',
+            position_id: emp ? emp.position_id : '',
+            job_title: emp ? emp.job_title : '',
+            work_email: emp ? emp.work_email : '',
+            mobile_phone: emp ? emp.mobile_phone : '',
+            deleted_at: new Date().toISOString(),
+            deleted_by_name: user?.full_name || 'Huỳnh Thanh Long'
+          };
+          appData.addDeletedId(empId, trashEntry);
+        }
       }
 
       utils.showToast(`Đã chuyển thành công ${successCount}/${employeeIds.length} nhân sự vào Thùng rác!`, 'success');
@@ -703,6 +720,7 @@ const appEmployees = {
       const json = await res.json();
 
       if (json.success) {
+        appData.saveLocalEmployee(payload);
         utils.showToast(isEdit ? 'Cập nhật nhân viên thành công!' : 'Thêm nhân viên mới thành công!', 'success');
         this.closeFormModal();
         await appData.init();
@@ -843,6 +861,22 @@ const appEmployees = {
       });
       const json = await res.json();
       if (json.success) {
+        const emp = appData.empMap[empId];
+        const trashEntry = {
+          trash_id: json.trash_id || `TRASH-${empId}-${Date.now()}`,
+          employee_id: empId,
+          full_name: emp ? emp.full_name : empId,
+          gender: emp ? emp.gender : '',
+          department_id: emp ? emp.department_id : '',
+          position_id: emp ? emp.position_id : '',
+          job_title: emp ? emp.job_title : '',
+          work_email: emp ? emp.work_email : '',
+          mobile_phone: emp ? emp.mobile_phone : '',
+          deleted_at: new Date().toISOString(),
+          deleted_by_name: user?.full_name || 'Huỳnh Thanh Long'
+        };
+        appData.addDeletedId(empId, trashEntry);
+
         utils.showToast(json.message || `Đã chuyển nhân sự ${empId} vào Thùng rác`, 'success');
         this.hideDeletePopover();
         await appData.init();

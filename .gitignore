@@ -9,6 +9,8 @@ Thumbs.db
 make-*.json
 credentials*.json
 sheets.key.json
+config/hrm-*.json
+*hrm-trunghai*.json
 .env
 .env.local
 *.log
