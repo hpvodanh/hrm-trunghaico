@@ -1012,7 +1012,7 @@
       <section class="view-panel" id="view-trash">
         <!-- KPI Cards for Trash -->
         <div class="kpi-grid">
-          <div class="kpi-card accent-red">
+          <div class="kpi-card accent-red clickable" id="kpi-card-trash-total" onclick="appTrash.filterByDate('')" title="Nhấn để xem toàn bộ nhân sự trong thùng rác">
             <div class="kpi-info">
               <span class="kpi-label">Nhân Sự Trong Thùng Rác</span>
               <span class="kpi-value" id="kpi-trash-total" style="color: var(--accent-red);">0</span>
@@ -1021,7 +1021,7 @@
             <div class="kpi-icon-box" style="background: var(--accent-red-soft); color: var(--accent-red);"><i class="fa-solid fa-trash-can"></i></div>
           </div>
 
-          <div class="kpi-card accent-amber">
+          <div class="kpi-card accent-amber clickable" id="kpi-card-trash-recent" onclick="appTrash.toggleRecentFilter()" title="Nhấn để lọc các mục đã xóa 7 ngày qua">
             <div class="kpi-info">
               <span class="kpi-label">Đã Xóa 7 Ngày Qua</span>
               <span class="kpi-value" id="kpi-trash-recent">0</span>
@@ -1054,7 +1054,14 @@
                   <option value="">-- Tất cả Phòng Ban / Đơn vị --</option>
                 </select>
 
-                <button class="btn btn-secondary btn-sm" id="btn-reset-trash-filters" title="Xóa bộ lọc">
+                <select id="trash-filter-date" class="filter-select" style="max-width: 175px;">
+                  <option value="">-- Tất cả thời gian --</option>
+                  <option value="today">Hôm nay</option>
+                  <option value="7days">Đã xóa 7 ngày qua</option>
+                  <option value="30days">Đã xóa 30 ngày qua</option>
+                </select>
+
+                <button class="btn btn-secondary btn-sm" id="btn-reset-trash-filters" onclick="appTrash.resetFilters()" title="Xóa tất cả bộ lọc">
                   <i class="fa-solid fa-rotate-left"></i>
                   <span>Đặt lại</span>
                 </button>

@@ -604,6 +604,31 @@ body {
   border-color: #CBD5E1;
 }
 
+.kpi-card.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.kpi-card.clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.kpi-card.clickable:active {
+  transform: translateY(0);
+}
+
+.kpi-card.clickable.active-filter {
+  border: 2px solid #D97706 !important;
+  background: #FFFBEB !important;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15), 0 4px 12px rgba(217, 119, 6, 0.1) !important;
+}
+
+.kpi-card.clickable.active-filter::before {
+  width: 6px;
+}
+
 .kpi-card::before {
   content: '';
   position: absolute;

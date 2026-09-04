@@ -8,6 +8,7 @@ const appTrash = {
   selectedIds: new Set(),
   currentPage: 1,
   pageSize: 25,
+  selectedDateFilter: '',
 
   init() {
     if (!this.initialized) {
@@ -24,6 +25,80 @@ const appTrash = {
       deptSelect.innerHTML = '<option value="">-- Tất cả Phòng Ban / Đơn vị --</option>' +
         appData.departments.map(d => `<option value="${d.department_id}">${d.department_name}</option>`).join('');
     }
+    const dateSelect = document.getElementById('trash-filter-date');
+    if (dateSelect) {
+      dateSelect.value = this.selectedDateFilter || '';
+    }
+  },
+
+  parseDate(dateStr) {
+    if (!dateStr) return null;
+    if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+    if (typeof dateStr === 'number') {
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    
+    if (typeof dateStr === 'string') {
+      const trimmed = dateStr.trim();
+      // Try standard parse first
+      let d = new Date(trimmed);
+      if (!isNaN(d.getTime())) return d;
+      
+      // Try DD/MM/YYYY or DD-MM-YYYY (with optional HH:mm:ss)
+      const parts = trimmed.split(/[\sT]+/);
+      const dateParts = parts[0].split(/[/-]/);
+      if (dateParts.length === 3) {
+        let day, month, year;
+        if (dateParts[0].length === 4) {
+          // YYYY-MM-DD
+          year = parseInt(dateParts[0], 10);
+          month = parseInt(dateParts[1], 10) - 1;
+          day = parseInt(dateParts[2], 10);
+        } else {
+          // DD/MM/YYYY
+          day = parseInt(dateParts[0], 10);
+          month = parseInt(dateParts[1], 10) - 1;
+          year = parseInt(dateParts[2], 10);
+        }
+        let hours = 0, minutes = 0, seconds = 0;
+        if (parts[1]) {
+          const timeParts = parts[1].split(':');
+          hours = parseInt(timeParts[0], 10) || 0;
+          minutes = parseInt(timeParts[1], 10) || 0;
+          seconds = parseInt(timeParts[2], 10) || 0;
+        }
+        d = new Date(year, month, day, hours, minutes, seconds);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  },
+
+  getPurgedTrashIds() {
+    try {
+      return JSON.parse(localStorage.getItem('hrm_purged_trash_ids') || '[]');
+    } catch (e) {
+      return [];
+    }
+  },
+
+  addPurgedTrashId(empId) {
+    try {
+      const ids = this.getPurgedTrashIds();
+      if (!ids.includes(empId)) {
+        ids.push(empId);
+        localStorage.setItem('hrm_purged_trash_ids', JSON.stringify(ids));
+      }
+    } catch (e) {}
+  },
+
+  removePurgedTrashId(empId) {
+    try {
+      let ids = this.getPurgedTrashIds();
+      ids = ids.filter(id => id !== empId);
+      localStorage.setItem('hrm_purged_trash_ids', JSON.stringify(ids));
+    } catch (e) {}
   },
 
   attachEventListeners() {
@@ -36,7 +111,7 @@ const appTrash = {
       });
     }
 
-    // Filter dropdown
+    // Filter dropdown dept
     const deptFilter = document.getElementById('trash-filter-dept');
     if (deptFilter) {
       deptFilter.addEventListener('change', () => {
@@ -45,14 +120,22 @@ const appTrash = {
       });
     }
 
-    // Reset filters
-    const resetBtn = document.getElementById('btn-reset-trash-filters');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (searchInput) searchInput.value = '';
-        if (deptFilter) deptFilter.value = '';
+    // Filter dropdown date
+    const dateFilter = document.getElementById('trash-filter-date');
+    if (dateFilter) {
+      dateFilter.addEventListener('change', (e) => {
+        this.selectedDateFilter = e.target.value;
         this.currentPage = 1;
         this.applyFilters();
+      });
+    }
+
+    // Reset filters button
+    const resetBtn = document.getElementById('btn-reset-trash-filters');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        this.resetFilters();
       });
     }
 
@@ -103,17 +186,38 @@ const appTrash = {
   },
 
   async fetchTrashData() {
+    let serverTrash = [];
     try {
       const res = await fetch('/api/trash');
       const json = await res.json();
-      if (json.success) {
-        this.trashList = json.data || [];
-        appData.trash = this.trashList;
+      if (json.success && Array.isArray(json.data)) {
+        serverTrash = json.data;
       }
     } catch (e) {
       console.error('Error fetching trash data:', e);
-      this.trashList = appData.trash || [];
     }
+
+    const trashMap = new Map();
+    // 1. Initial memory data
+    (appData.trash || []).forEach(item => {
+      if (item && item.employee_id) trashMap.set(item.employee_id, item);
+    });
+    // 2. Server response
+    serverTrash.forEach(item => {
+      if (item && item.employee_id) trashMap.set(item.employee_id, item);
+    });
+    // 3. LocalStorage
+    const localTrash = (appData && typeof appData.getLocalTrash === 'function') ? appData.getLocalTrash() : [];
+    localTrash.forEach(item => {
+      if (item && item.employee_id) {
+        const existing = trashMap.get(item.employee_id);
+        trashMap.set(item.employee_id, { ...existing, ...item });
+      }
+    });
+
+    const purgedIds = this.getPurgedTrashIds();
+    this.trashList = Array.from(trashMap.values()).filter(item => !purgedIds.includes(item.employee_id));
+    appData.trash = this.trashList;
   },
 
   async render() {
@@ -132,9 +236,63 @@ const appTrash = {
     }
   },
 
+  // Toggle filter for items deleted in the last 7 days
+  toggleRecentFilter() {
+    if (this.selectedDateFilter === '7days') {
+      this.selectedDateFilter = '';
+      const dateSelect = document.getElementById('trash-filter-date');
+      if (dateSelect) dateSelect.value = '';
+      utils.showToast('Đã hiển thị toàn bộ nhân sự trong Thùng rác', 'info');
+    } else {
+      this.selectedDateFilter = '7days';
+      const dateSelect = document.getElementById('trash-filter-date');
+      if (dateSelect) dateSelect.value = '7days';
+      utils.showToast('Đang lọc các mục đã xóa trong 7 ngày qua', 'info');
+    }
+    this.currentPage = 1;
+    this.applyFilters();
+  },
+
+  filterByDate(val) {
+    this.selectedDateFilter = val || '';
+    const dateSelect = document.getElementById('trash-filter-date');
+    if (dateSelect) dateSelect.value = this.selectedDateFilter;
+    this.currentPage = 1;
+    this.applyFilters();
+    if (!val) {
+      utils.showToast('Đã hiển thị toàn bộ nhân sự trong Thùng rác', 'info');
+    }
+  },
+
+  resetFilters() {
+    const searchInput = document.getElementById('trash-search-input');
+    const deptFilter = document.getElementById('trash-filter-dept');
+    const dateFilter = document.getElementById('trash-filter-date');
+
+    if (searchInput) searchInput.value = '';
+    if (deptFilter) deptFilter.value = '';
+    if (dateFilter) dateFilter.value = '';
+
+    this.selectedDateFilter = '';
+    this.currentPage = 1;
+    this.selectedIds.clear();
+
+    const recentCard = document.getElementById('kpi-card-trash-recent');
+    if (recentCard) recentCard.classList.remove('active-filter');
+
+    this.applyFilters();
+    utils.showToast('Đã đặt lại tất cả bộ lọc thùng rác', 'info');
+  },
+
   applyFilters() {
     const searchVal = (document.getElementById('trash-search-input')?.value || '').toLowerCase().trim();
     const deptVal = document.getElementById('trash-filter-dept')?.value || '';
+    const dateVal = document.getElementById('trash-filter-date')?.value || this.selectedDateFilter || '';
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0);
+    const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
 
     this.filteredList = (this.trashList || []).filter(item => {
       // Search match
@@ -155,6 +313,15 @@ const appTrash = {
         return false;
       }
 
+      // Date match
+      if (dateVal) {
+        const itemDate = this.parseDate(item.deleted_at);
+        if (!itemDate) return false;
+        if (dateVal === 'today' && itemDate < startOfToday) return false;
+        if (dateVal === '7days' && itemDate < sevenDaysAgo) return false;
+        if (dateVal === '30days' && itemDate < thirtyDaysAgo) return false;
+      }
+
       return true;
     });
 
@@ -168,11 +335,11 @@ const appTrash = {
   renderKPIs() {
     const total = this.trashList.length;
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7, 0, 0, 0);
 
     const recentDeleted = this.trashList.filter(item => {
-      if (!item.deleted_at) return false;
-      return new Date(item.deleted_at) >= sevenDaysAgo;
+      const d = this.parseDate(item.deleted_at);
+      return d && d >= sevenDaysAgo;
     }).length;
 
     // Dept with most deleted
@@ -199,6 +366,16 @@ const appTrash = {
 
     const topDeptEl = document.getElementById('kpi-trash-top-dept');
     if (topDeptEl) topDeptEl.textContent = total > 0 ? `${topDept} (${maxDeptCount})` : '-';
+
+    // Update active visual indicator on KPI card
+    const recentCard = document.getElementById('kpi-card-trash-recent');
+    if (recentCard) {
+      if (this.selectedDateFilter === '7days') {
+        recentCard.classList.add('active-filter');
+      } else {
+        recentCard.classList.remove('active-filter');
+      }
+    }
   },
 
   getCurrentPageItems() {
@@ -538,6 +715,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        this.removePurgedTrashId(empId);
         if (appData.removeDeletedId) appData.removeDeletedId(empId);
         utils.showToast(json.message || `Đã khôi phục thành công ${empId}`, 'success');
         this.hidePopover();
@@ -584,6 +762,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        this.addPurgedTrashId(empId);
         if (appData.purgeDeletedId) appData.purgeDeletedId(empId);
         utils.showToast(json.message || `Đã xóa vĩnh viễn ${empId}`, 'success');
         this.hidePopover();
@@ -631,6 +810,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        ids.forEach(id => this.removePurgedTrashId(id));
         if (appData.removeDeletedId) ids.forEach(id => appData.removeDeletedId(id));
         utils.showToast(json.message || `Đã khôi phục thành công ${ids.length} nhân sự`, 'success');
         this.selectedIds.clear();
@@ -671,6 +851,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        ids.forEach(id => this.addPurgedTrashId(id));
         if (appData.purgeDeletedId) ids.forEach(id => appData.purgeDeletedId(id));
         utils.showToast(json.message || `Đã xóa vĩnh viễn ${ids.length} nhân sự`, 'success');
         this.selectedIds.clear();
@@ -707,6 +888,7 @@ const appTrash = {
       });
       const json = await res.json();
       if (json.success) {
+        (this.trashList || []).forEach(item => this.addPurgedTrashId(item.employee_id));
         if (appData.purgeDeletedId) (this.trashList || []).forEach(item => appData.purgeDeletedId(item.employee_id));
         if (appData.clearLocalTrash) appData.clearLocalTrash();
         utils.showToast(json.message || 'Đã dọn sạch toàn bộ Thùng rác', 'success');
