@@ -546,6 +546,9 @@ const appTrash = {
         appDashboard.init();
         if (typeof appEmployees !== 'undefined') appEmployees.applyFilters();
         await this.render();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Không thể khôi phục nhân sự', 'error');
         if (btnElement) {
@@ -587,6 +590,9 @@ const appTrash = {
         this.selectedIds.delete(empId);
         await appData.init();
         await this.render();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Không thể xóa nhân sự', 'error');
         if (btnElement) {
@@ -632,6 +638,9 @@ const appTrash = {
         appDashboard.init();
         if (typeof appEmployees !== 'undefined') appEmployees.applyFilters();
         await this.render();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Lỗi khôi phục hàng loạt', 'error');
       }
@@ -667,6 +676,9 @@ const appTrash = {
         this.selectedIds.clear();
         await appData.init();
         await this.render();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Lỗi xóa vĩnh viễn', 'error');
       }
@@ -701,6 +713,9 @@ const appTrash = {
         this.selectedIds.clear();
         await appData.init();
         await this.render();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Lỗi khi dọn thùng rác', 'error');
       }

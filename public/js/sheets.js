@@ -258,6 +258,31 @@ const appSheets = (() => {
         });
     }
 
+    function autoSync() {
+        if (!currentConfig || currentConfig.autoSyncOnSave === false) return;
+        if (!connectionStatus || !connectionStatus.success) return;
+
+        const user = (typeof appAuth !== 'undefined' && typeof appAuth.getCurrentUser === 'function')
+            ? appAuth.getCurrentUser()
+            : { employee_id: 'TH-1948', full_name: 'Huỳnh Thanh Long', role: 'ADMIN' };
+
+        fetch('/api/sheets/sync-to-cloud', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: user?.employee_id || 'TH-1948',
+                user_name: user?.full_name || 'Huỳnh Thanh Long',
+                user_role: user?.role || 'ADMIN'
+            })
+        }).then(res => res.json()).then(data => {
+            if (data.success) {
+                console.log('[Auto-sync] Đã đồng bộ thay đổi lên Google Sheets.');
+            }
+        }).catch(err => {
+            console.warn('[Auto-sync error]:', err.message);
+        });
+    }
+
     return {
         init: loadStatus,
         openModal,
@@ -265,7 +290,8 @@ const appSheets = (() => {
         saveConfig,
         syncToCloud,
         pullFromCloud,
-        copyEmail
+        copyEmail,
+        autoSync
     };
 })();
 

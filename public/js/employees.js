@@ -376,6 +376,9 @@ const appEmployees = {
       
       this.currentPage = 1;
       this.applyFilters();
+      if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+        appSheets.autoSync();
+      }
     } catch (err) {
       console.error(err);
       utils.showToast('Lỗi khi thực hiện xóa hàng loạt: ' + err.message, 'error');
@@ -726,6 +729,9 @@ const appEmployees = {
         await appData.init();
         appDashboard.init();
         this.applyFilters();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Lỗi khi lưu dữ liệu', 'error');
       }
@@ -883,6 +889,9 @@ const appEmployees = {
         appDashboard.init();
         if (typeof appTrash !== 'undefined') appTrash.render();
         this.applyFilters();
+        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
+          appSheets.autoSync();
+        }
       } else {
         utils.showToast(json.message || 'Không thể xóa nhân viên', 'error');
         if (btnElement) {
