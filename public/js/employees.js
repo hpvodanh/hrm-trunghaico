@@ -457,60 +457,146 @@ const appEmployees = {
       return;
     }
 
-    try {
-      let successCount = 0;
-      const user = (typeof appAuth !== 'undefined' && appAuth.currentUser) ? appAuth.currentUser : { employee_id: 'TH-1948', full_name: 'Huỳnh Thanh Long', role: 'ADMIN' };
+    const deleteBtn = document.querySelector('#bulk-delete-bar button[onclick*="bulkDeleteEmployees"]');
+    const origHtml = deleteBtn ? deleteBtn.innerHTML : '';
+    if (deleteBtn) {
+      deleteBtn.disabled = true;
+      deleteBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang xóa (${employeeIds.length})...`;
+    }
 
-      for (const empId of employeeIds) {
-        const res = await fetch(`/api/employees/${empId}`, {
-          method: 'DELETE',
+    try {
+      const user = (typeof appAuth !== 'undefined' && typeof appAuth.getCurrentUser === 'function')
+        ? appAuth.getCurrentUser()
+        : (typeof appAuth !== 'undefined' && appAuth?.currentUser ? appAuth.currentUser : { employee_id: 'TH-1948', full_name: 'Huỳnh Thanh Long', role: 'ADMIN' });
+
+      let successCount = 0;
+      let newTrashEntries = [];
+
+      // 1. Gọi API xóa hàng loạt tối ưu /api/employees/delete-bulk (1 lần gọi nhanh)
+      let bulkSucceeded = false;
+      try {
+        const res = await fetch('/api/employees/delete-bulk', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            operator_id: user.employee_id,
-            operator_name: user.full_name,
-            operator_role: user.role
+            employee_ids: employeeIds,
+            operator_id: user?.employee_id || 'TH-1948',
+            operator_name: user?.full_name || 'Huỳnh Thanh Long',
+            operator_role: user?.role || 'ADMIN'
           })
         });
-        const json = await res.json();
-        if (json.success) {
-          successCount++;
-          const emp = appData.empMap[empId];
-          const trashEntry = {
-            trash_id: json.trash_id || `TRASH-${empId}-${Date.now()}`,
-            employee_id: empId,
-            full_name: emp ? emp.full_name : empId,
-            gender: emp ? emp.gender : '',
-            department_id: emp ? emp.department_id : '',
-            position_id: emp ? emp.position_id : '',
-            job_title: emp ? emp.job_title : '',
-            work_email: emp ? emp.work_email : '',
-            mobile_phone: emp ? emp.mobile_phone : '',
-            deleted_at: new Date().toISOString(),
-            deleted_by_name: user?.full_name || 'Huỳnh Thanh Long'
-          };
-          appData.addDeletedId(empId, trashEntry);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success) {
+            bulkSucceeded = true;
+            successCount = json.count || employeeIds.length;
+            newTrashEntries = json.items || [];
+          }
+        }
+      } catch (postErr) {
+        console.warn('API /api/employees/delete-bulk chưa phản hồi, chuyển sang phương thức dự phòng:', postErr);
+      }
+
+      // 2. Dự phòng nếu bulk API không thành công: xóa tuần tự
+      if (!bulkSucceeded) {
+        for (const empId of employeeIds) {
+          try {
+            const res = await fetch(`/api/employees/${empId}`, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                operator_id: user?.employee_id || 'TH-1948',
+                operator_name: user?.full_name || 'Huỳnh Thanh Long',
+                operator_role: user?.role || 'ADMIN'
+              })
+            });
+            const json = await res.json();
+            if (json.success) {
+              successCount++;
+              const emp = appData.empMap ? appData.empMap[empId] : null;
+              newTrashEntries.push({
+                trash_id: json.trash_id || `TRASH-${empId}-${Date.now()}`,
+                employee_id: empId,
+                full_name: emp ? emp.full_name : empId,
+                gender: emp ? emp.gender : '',
+                department_id: emp ? emp.department_id : '',
+                position_id: emp ? emp.position_id : '',
+                job_title: emp ? emp.job_title : '',
+                work_email: emp ? emp.work_email : '',
+                mobile_phone: emp ? emp.mobile_phone : '',
+                deleted_at: new Date().toISOString(),
+                deleted_by_name: user?.full_name || 'Huỳnh Thanh Long'
+              });
+            }
+          } catch (itemErr) {
+            console.error('Lỗi khi xóa nhân sự ' + empId, itemErr);
+          }
         }
       }
 
-      utils.showToast(`Đã chuyển thành công ${successCount}/${employeeIds.length} nhân sự vào Thùng rác!`, 'success');
-      
-      // Xóa sạch danh sách ID đã chọn và ẩn thanh công cụ
+      // 3. Cập nhật localStorage và thùng rác cục bộ ngay lập tức
+      const idSet = new Set(employeeIds);
+      newTrashEntries.forEach(entry => {
+        appData.addDeletedId(entry.employee_id, entry);
+      });
+      employeeIds.forEach(empId => {
+        if (!newTrashEntries.some(t => t.employee_id === empId)) {
+          const emp = appData.empMap ? appData.empMap[empId] : null;
+          appData.addDeletedId(empId, {
+            trash_id: `TRASH-${empId}-${Date.now()}`,
+            employee_id: empId,
+            full_name: emp ? emp.full_name : empId,
+            deleted_at: new Date().toISOString(),
+            deleted_by_name: user?.full_name || 'Huỳnh Thanh Long'
+          });
+        }
+      });
+
+      // 4. Xóa ngay khỏi danh sách nhân viên trên client để cập nhật tức thì (0ms)
+      appData.employees = (appData.employees || []).filter(e => !idSet.has(e.employee_id));
+      if (appData.tables && appData.tables['03_Employees']) {
+        appData.tables['03_Employees'] = appData.tables['03_Employees'].filter(e => !idSet.has(e.employee_id));
+      }
+      if (appData.tables && appData.tables['00_Master_Profiles']) {
+        appData.tables['00_Master_Profiles'] = appData.tables['00_Master_Profiles'].filter(m => !idSet.has(m['Mã nhân viên']) && !idSet.has(m.employee_id));
+      }
+
+      // 5. Xóa danh sách chọn và ẩn thanh thao tác hàng loạt
       this.selectedIds.clear();
       this.disableSelectMode();
 
-      // Đồng bộ lại dữ liệu từ server và cập nhật giao diện ngay lập tức
-      await appData.init();
-      appDashboard.init();
-      if (typeof appTrash !== 'undefined') appTrash.render();
-      
+      // 6. Hiển thị thông báo Toast thành công ngay lập tức
+      const finalCount = successCount > 0 ? successCount : employeeIds.length;
+      utils.showToast(`Đã chuyển thành công ${finalCount} nhân sự vào Thùng rác!`, 'success');
+
+      // 7. Cập nhật bảng ngay lập tức
       this.currentPage = 1;
       this.applyFilters();
-      if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
-        appSheets.autoSync();
+
+      // 8. Cập nhật số liệu các view liên quan
+      if (typeof appDashboard !== 'undefined' && typeof appDashboard.init === 'function') {
+        appDashboard.init();
       }
+      if (typeof appTrash !== 'undefined' && typeof appTrash.render === 'function') {
+        appTrash.render();
+      }
+
+      // 9. Đồng bộ sâu từ server chạy ngầm
+      try {
+        await appData.init();
+        this.applyFilters();
+        if (typeof appTrash !== 'undefined') appTrash.render();
+      } catch (syncErr) {
+        console.warn('Đồng bộ nền sau xóa không ảnh hưởng giao diện:', syncErr);
+      }
+
     } catch (err) {
-      console.error(err);
+      console.error('Lỗi khi thực hiện xóa hàng loạt:', err);
       utils.showToast('Lỗi khi thực hiện xóa hàng loạt: ' + err.message, 'error');
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.innerHTML = origHtml;
+      }
     }
   },
 
@@ -996,7 +1082,7 @@ const appEmployees = {
       });
       const json = await res.json();
       if (json.success) {
-        const emp = appData.empMap[empId];
+        const emp = appData.empMap ? appData.empMap[empId] : null;
         const trashEntry = {
           trash_id: json.trash_id || `TRASH-${empId}-${Date.now()}`,
           employee_id: empId,
@@ -1012,14 +1098,33 @@ const appEmployees = {
         };
         appData.addDeletedId(empId, trashEntry);
 
+        // Xóa ngay khỏi danh sách client để hiển thị tức thì
+        appData.employees = (appData.employees || []).filter(e => e.employee_id !== empId);
+        if (appData.tables && appData.tables['03_Employees']) {
+          appData.tables['03_Employees'] = appData.tables['03_Employees'].filter(e => e.employee_id !== empId);
+        }
+        if (appData.tables && appData.tables['00_Master_Profiles']) {
+          appData.tables['00_Master_Profiles'] = appData.tables['00_Master_Profiles'].filter(m => m['Mã nhân viên'] !== empId && m.employee_id !== empId);
+        }
+        this.selectedIds.delete(empId);
+
         utils.showToast(json.message || `Đã chuyển nhân sự ${empId} vào Thùng rác`, 'success');
         this.hideDeletePopover();
-        await appData.init();
-        appDashboard.init();
-        if (typeof appTrash !== 'undefined') appTrash.render();
         this.applyFilters();
-        if (typeof appSheets !== 'undefined' && typeof appSheets.autoSync === 'function') {
-          appSheets.autoSync();
+
+        if (typeof appDashboard !== 'undefined' && typeof appDashboard.init === 'function') {
+          appDashboard.init();
+        }
+        if (typeof appTrash !== 'undefined' && typeof appTrash.render === 'function') {
+          appTrash.render();
+        }
+
+        try {
+          await appData.init();
+          this.applyFilters();
+          if (typeof appTrash !== 'undefined') appTrash.render();
+        } catch (syncErr) {
+          console.warn('Đồng bộ nền sau xóa không ảnh hưởng giao diện:', syncErr);
         }
       } else {
         utils.showToast(json.message || 'Không thể xóa nhân viên', 'error');
