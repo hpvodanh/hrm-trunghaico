@@ -1,5 +1,5 @@
 // ==========================================================================
-// EMPLOYEE MANAGEMENT MODULE (Cập nhật Chọn tất cả & Xóa hàng loạt)
+// EMPLOYEE MANAGEMENT MODULE (Đã tích hợp Xóa hàng loạt chuẩn xác)
 // ==========================================================================
 
 const appEmployees = {
@@ -8,7 +8,7 @@ const appEmployees = {
   pageSize: 25,
   filteredList: [],
   selectedEmployee: null,
-  selectedIds: new Set(), // Quản lý danh sách ID nhân viên được tích chọn
+  selectedIds: new Set(), // Quản lý danh sách ID nhân viên được tích chọn hàng loạt
 
   init() {
     this.populateFilterDropdowns();
@@ -76,7 +76,7 @@ const appEmployees = {
       });
     }
 
-    // Modal Tabs Navigation
+    // Detail Modal Tabs Navigation
     document.querySelectorAll('#modal-employee-detail .modal-tab-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const targetTab = e.currentTarget.getAttribute('data-tab');
@@ -255,6 +255,7 @@ const appEmployees = {
       `;
     }).join('');
 
+    // Đồng bộ trạng thái checkbox "Chọn tất cả" trên header bảng
     const selectAllCheck = document.getElementById('select-all-emp');
     if (selectAllCheck && paginated.length > 0) {
       selectAllCheck.checked = paginated.every(e => this.selectedIds.has(e.employee_id));
@@ -318,7 +319,7 @@ const appEmployees = {
     }
   },
 
-  // Thực hiện xóa hàng loạt chuyển vào Thùng rác
+  // Thực hiện xóa hàng loạt chuyển vào Thùng rác và render lại ngay lập tức
   async bulkDeleteEmployees() {
     const employeeIds = Array.from(this.selectedIds);
     if (employeeIds.length === 0) return;
@@ -351,12 +352,11 @@ const appEmployees = {
       this.selectedIds.clear();
       this.updateBulkDeleteBar();
 
-      // Đồng bộ lại dữ liệu từ server và render lại ngay lập tức
+      // Đồng bộ lại dữ liệu từ server và cập nhật giao diện ngay lập tức
       await appData.init();
       appDashboard.init();
       if (typeof appTrash !== 'undefined') appTrash.render();
       
-      // Ép gọi lại applyFilters để bảng nhân sự cập nhật giao diện ngay lập tức
       this.currentPage = 1;
       this.applyFilters();
     } catch (err) {
