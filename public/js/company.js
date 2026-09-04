@@ -227,6 +227,7 @@ const appCompany = {
           finalLogoUrl = uploadJson.logo_url;
         } else {
           utils.showToast(uploadJson.message || 'Lỗi khi tải logo lên máy chủ', 'error');
+          return;
         }
       }
 
@@ -255,6 +256,7 @@ const appCompany = {
 
       if (json.success) {
         this.currentCompany = json.company;
+        this.tempLogoBase64 = null;
         if (window.appData) appData.company = json.company;
         this.applyBranding(json.company);
         this.closeModal();

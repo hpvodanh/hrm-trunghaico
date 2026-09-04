@@ -61,6 +61,7 @@ app.use('/api/', apiLimiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 // ==========================================
 // 2. SECURITY & AUTH HELPERS
@@ -121,9 +122,10 @@ function optionalAuth(req, res, next) {
     }
 }
 
-// Path to JSON database
+// Path to JSON database & uploads directory
 const DB_PATH = path.join(__dirname, 'database_schema.json');
 const TMP_DB_PATH = path.join(os.tmpdir(), 'database_schema.json');
+const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');
 let inMemoryDb = null;
 
 // Ensure default admin & demo accounts exist in database
@@ -3429,19 +3431,21 @@ app.post('/api/company/upload-logo', (req, res) => {
             return res.status(400).json({ success: false, message: 'Chưa có dữ liệu ảnh logo' });
         }
 
-        const matches = image_base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        const matches = image_base64.match(/^data:([^;]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
             return res.status(400).json({ success: false, message: 'Định dạng ảnh Base64 không hợp lệ' });
         }
 
-        const mimeType = matches[1];
+        const mimeType = matches[1].toLowerCase();
         let ext = 'png';
         if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
         else if (mimeType.includes('svg')) ext = 'svg';
         else if (mimeType.includes('webp')) ext = 'webp';
+        else if (mimeType.includes('gif')) ext = 'gif';
 
         const buffer = Buffer.from(matches[2], 'base64');
         const fileName = `company_logo_${Date.now()}.${ext}`;
+        const uploadsDir = UPLOADS_DIR;
         const filePath = path.join(uploadsDir, fileName);
         let finalLogoUrl = `uploads/${fileName}`;
 
@@ -3452,7 +3456,7 @@ app.post('/api/company/upload-logo', (req, res) => {
             fs.writeFileSync(filePath, buffer);
         } catch (e) {
             console.warn('Cannot write logo to disk (Vercel read-only), using base64 URL directly:', e.message);
-            finalLogoUrl = imageBase64;
+            finalLogoUrl = image_base64;
         }
 
         const db = loadDatabase();
