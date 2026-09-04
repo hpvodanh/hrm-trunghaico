@@ -291,6 +291,17 @@ function recordLog(db, { action_type, module, description, user_id, user_name, u
     return logEntry;
 }
 
+// Auto-sync specific tables to Google Sheets directly
+async function autoSyncToSheets(db, tableNames) {
+    try {
+        const cfg = googleSheets.getConfig();
+        if (!cfg.autoSyncOnSave || !cfg.spreadsheetId) return;
+        await googleSheets.exportTablesToGoogleSheets(db, tableNames);
+    } catch (e) {
+        console.warn('[AutoSync to Sheets Warning]:', e.message);
+    }
+}
+
 // ==========================================
 // API ENDPOINTS
 // ==========================================
@@ -1653,7 +1664,7 @@ app.get('/api/employees/:id', (req, res) => {
 });
 
 // 5. CREATE NEW EMPLOYEE (FULL 34 ATTRIBUTES)
-app.post('/api/employees', (req, res) => {
+app.post('/api/employees', async (req, res) => {
     const db = loadDatabase();
     const body = req.body;
 
@@ -1906,6 +1917,7 @@ app.post('/api/employees', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['00_Master_Profiles', '03_Employees', '04_Contacts_Addresses', '05_Identity_Docs', '06_Emergency_Contacts', '07_Education', '08_Salaries_Banks', '09_Insurance_Welfare', '10_Contracts', '11_System_Accounts', '12_System_Logs']);
 
     res.status(201).json({
         success: true,
@@ -1917,7 +1929,7 @@ app.post('/api/employees', (req, res) => {
 
 
 // 6. UPDATE EMPLOYEE (FULL 34 ATTRIBUTES)
-app.put('/api/employees/:id', (req, res) => {
+app.put('/api/employees/:id', async (req, res) => {
     const db = loadDatabase();
     const id = req.params.id;
     const body = req.body;
@@ -2119,6 +2131,7 @@ app.put('/api/employees/:id', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['00_Master_Profiles', '03_Employees', '04_Contacts_Addresses', '05_Identity_Docs', '06_Emergency_Contacts', '07_Education', '08_Salaries_Banks', '09_Insurance_Welfare', '10_Contracts', '11_System_Accounts', '12_System_Logs']);
 
     res.json({
         success: true,
@@ -2127,7 +2140,7 @@ app.put('/api/employees/:id', (req, res) => {
 });
 
 // 7. SOFT DELETE EMPLOYEE (MOVE TO RECYCLE BIN)
-app.delete('/api/employees/:id', (req, res) => {
+app.delete('/api/employees/:id', async (req, res) => {
     const db = loadDatabase();
     const id = req.params.id;
 
@@ -2226,6 +2239,7 @@ app.delete('/api/employees/:id', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['00_Master_Profiles', '03_Employees', '13_Recycle_Bin', '12_System_Logs']);
     res.json({
         success: true,
         message: `Đã chuyển nhân viên ${empName} (${id}) vào Thùng rác`,
@@ -2349,6 +2363,7 @@ app.post('/api/trash/restore/:id', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['00_Master_Profiles', '03_Employees', '13_Recycle_Bin', '12_System_Logs']);
     res.json({
         success: true,
         message: `Đã khôi phục thành công nhân viên ${trashItem.full_name} (${id})`
@@ -2356,7 +2371,7 @@ app.post('/api/trash/restore/:id', (req, res) => {
 });
 
 // BULK RESTORE
-app.post('/api/trash/restore-bulk', (req, res) => {
+app.post('/api/trash/restore-bulk', async (req, res) => {
     const db = loadDatabase();
     const { employee_ids } = req.body;
     if (!Array.isArray(employee_ids) || employee_ids.length === 0) {
@@ -2444,6 +2459,7 @@ app.post('/api/trash/restore-bulk', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['00_Master_Profiles', '03_Employees', '13_Recycle_Bin', '12_System_Logs']);
     res.json({
         success: true,
         message: `Đã khôi phục thành công ${restoredCount} nhân sự`,
@@ -2452,7 +2468,7 @@ app.post('/api/trash/restore-bulk', (req, res) => {
 });
 
 // PERMANENT DELETE FROM RECYCLE BIN
-app.delete('/api/trash/permanent/:id', (req, res) => {
+app.delete('/api/trash/permanent/:id', async (req, res) => {
     const db = loadDatabase();
     const id = req.params.id;
     const trash = db.tables['13_Recycle_Bin'] || [];
@@ -2477,6 +2493,7 @@ app.delete('/api/trash/permanent/:id', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['13_Recycle_Bin', '12_System_Logs']);
     res.json({
         success: true,
         message: `Đã xóa vĩnh viễn nhân viên ${trashItem.full_name} (${id}) khỏi hệ thống`
@@ -2484,7 +2501,7 @@ app.delete('/api/trash/permanent/:id', (req, res) => {
 });
 
 // BULK PERMANENT DELETE
-app.delete('/api/trash/permanent-bulk', (req, res) => {
+app.delete('/api/trash/permanent-bulk', async (req, res) => {
     const db = loadDatabase();
     const { employee_ids } = req.body;
     if (!Array.isArray(employee_ids) || employee_ids.length === 0) {
@@ -2507,6 +2524,7 @@ app.delete('/api/trash/permanent-bulk', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['13_Recycle_Bin', '12_System_Logs']);
     res.json({
         success: true,
         message: `Đã xóa vĩnh viễn ${deletedCount} nhân sự khỏi hệ thống`,
@@ -2515,7 +2533,7 @@ app.delete('/api/trash/permanent-bulk', (req, res) => {
 });
 
 // EMPTY RECYCLE BIN
-app.delete('/api/trash/empty', (req, res) => {
+app.delete('/api/trash/empty', async (req, res) => {
     const db = loadDatabase();
     const trash = db.tables['13_Recycle_Bin'] || [];
     const count = trash.length;
@@ -2533,6 +2551,7 @@ app.delete('/api/trash/empty', (req, res) => {
     });
 
     saveDatabase(db);
+    await autoSyncToSheets(db, ['13_Recycle_Bin', '12_System_Logs']);
     res.json({
         success: true,
         message: `Đã dọn sạch toàn bộ Thùng rác (${count} nhân sự)`

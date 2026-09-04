@@ -351,78 +351,93 @@ async function ensureSheets(sheets, spreadsheetId, requiredNames) {
     }
 }
 
-// Export a single table to Google Sheet
-async function exportTableToGoogleSheets(tableName, rows, customSpreadsheetId, customCredentials) {
+// Export specific tables to Google Sheet (Fast Batch API)
+async function exportTablesToGoogleSheets(db, targetTableNames, customSpreadsheetId, customCredentials) {
     const cfg = getConfig();
-    const spreadsheetId = customSpreadsheetId || cfg.spreadsheetId;
-    if (!spreadsheetId) return false;
-
-    const sheets = getSheetsClient(customCredentials);
-    await ensureSheets(sheets, spreadsheetId, [tableName]);
-
-    let headers = [];
-    if (rows && rows.length > 0) {
-        headers = Object.keys(rows[0]);
-    } else {
-        headers = ['id', 'status', 'note'];
+    const spreadsheetId = extractSpreadsheetId(customSpreadsheetId || cfg.spreadsheetId);
+    if (!spreadsheetId) {
+        throw new Error('Chưa cấu hình Google Spreadsheet ID');
     }
 
-    const values = [
-        headers,
-        ...rows.map(row => headers.map(h => {
-            const val = row[h];
-            if (val === undefined || val === null) return '';
-            if (typeof val === 'object') return JSON.stringify(val);
-            return val;
-        }))
-    ];
+    const allTables = db.tables || {};
+    const tableNames = (targetTableNames && targetTableNames.length > 0)
+        ? targetTableNames.filter(t => allTables[t] !== undefined)
+        : Object.keys(allTables);
 
-    // Clear old data
+    if (tableNames.length === 0) {
+        return { success: true, count: 0 };
+    }
+
+    const sheets = getSheetsClient(customCredentials);
+
+    // 1. Ensure all tabs exist (1 API call)
+    await ensureSheets(sheets, spreadsheetId, tableNames);
+
+    // 2. Batch clear old data (1 API call)
+    const rangesToClear = tableNames.map(t => `'${t.replace(/'/g, "''")}'!A1:ZZ50000`);
     try {
-        await sheets.spreadsheets.values.clear({
+        await sheets.spreadsheets.values.batchClear({
             spreadsheetId,
-            range: `'${tableName}'!A1:ZZ50000`
+            requestBody: { ranges: rangesToClear }
         });
-    } catch (e) {}
+    } catch (e) {
+        console.warn('[Google Sheets] batchClear warning:', e.message);
+    }
 
-    // Write new data
-    await sheets.spreadsheets.values.update({
+    // 3. Prepare data for all tables
+    const batchData = [];
+    for (const tableName of tableNames) {
+        const rows = allTables[tableName] || [];
+        let headers = [];
+        if (rows && rows.length > 0) {
+            headers = Object.keys(rows[0]);
+        } else {
+            headers = ['id', 'status', 'note'];
+        }
+
+        const values = [
+            headers,
+            ...rows.map(row => headers.map(h => {
+                const val = row[h];
+                if (val === undefined || val === null) return '';
+                if (typeof val === 'object') return JSON.stringify(val);
+                return val;
+            }))
+        ];
+
+        batchData.push({
+            range: `'${tableName.replace(/'/g, "''")}'!A1`,
+            values
+        });
+    }
+
+    // 4. Batch update all data (1 API call)
+    const updateRes = await sheets.spreadsheets.values.batchUpdate({
         spreadsheetId,
-        range: `'${tableName}'!A1`,
-        valueInputOption: 'USER_ENTERED',
-        requestBody: { values }
+        requestBody: {
+            valueInputOption: 'USER_ENTERED',
+            data: batchData
+        }
     });
 
-    return true;
+    console.log(`[Google Sheets] Đã đồng bộ thành công ${tableNames.length} bảng lên Google Sheets.`);
+    return {
+        success: true,
+        tablesCount: tableNames.length,
+        totalUpdatedCells: updateRes.data?.totalUpdatedCells || 0
+    };
+}
+
+// Export a single table to Google Sheet
+async function exportTableToGoogleSheets(tableName, rows, customSpreadsheetId, customCredentials) {
+    const db = { tables: { [tableName]: rows || [] } };
+    return exportTablesToGoogleSheets(db, [tableName], customSpreadsheetId, customCredentials);
 }
 
 // Export ALL tables from local DB to Google Sheets
 async function exportAllToGoogleSheets(db, customSpreadsheetId, customCredentials) {
-    const cfg = getConfig();
-    const spreadsheetId = customSpreadsheetId || cfg.spreadsheetId;
-    if (!spreadsheetId) {
-        throw new Error('Chưa cấu hình Spreadsheet ID');
-    }
-
-    const sheets = getSheetsClient(customCredentials);
     const tableNames = Object.keys(db.tables || {});
-    await ensureSheets(sheets, spreadsheetId, tableNames);
-
-    console.log(`[Google Sheets] Bắt đầu đồng bộ ${tableNames.length} bảng lên Google Sheets...`);
-    const results = [];
-
-    for (const tableName of tableNames) {
-        const rows = db.tables[tableName] || [];
-        try {
-            await exportTableToGoogleSheets(tableName, rows, spreadsheetId, customCredentials);
-            results.push({ table: tableName, rows: rows.length, success: true });
-        } catch (err) {
-            console.error(`[Google Sheets] Lỗi đồng bộ bảng "${tableName}":`, err.message);
-            results.push({ table: tableName, rows: rows.length, success: false, error: err.message });
-        }
-    }
-
-    return { success: true, results };
+    return exportTablesToGoogleSheets(db, tableNames, customSpreadsheetId, customCredentials);
 }
 
 // Import ALL tables from Google Sheets into local format
@@ -470,27 +485,17 @@ async function importAllFromGoogleSheets(customSpreadsheetId, customCredentials)
     return { tables };
 }
 
-// Debounced background sync for efficient performance
-let syncTimer = null;
-let lastDbSnapshot = null;
+async function triggerBackgroundSync(db) {
+    const cfg = getConfig();
+    if (!cfg.autoSyncOnSave || !cfg.spreadsheetId) return;
 
-function triggerBackgroundSync(db) {
-    lastDbSnapshot = db;
-    if (syncTimer) clearTimeout(syncTimer);
-    syncTimer = setTimeout(async () => {
-        const cfg = getConfig();
-        if (!cfg.autoSyncOnSave || !cfg.spreadsheetId) return;
-
-        try {
-            console.log('[Google Sheets] Đang đồng bộ nền lên Google Sheet...');
-            if (lastDbSnapshot) {
-                await exportAllToGoogleSheets(lastDbSnapshot);
-                console.log('[Google Sheets] Đồng bộ nền hoàn tất.');
-            }
-        } catch (e) {
-            console.warn('[Google Sheets Sync Warning]:', e.message);
-        }
-    }, 2500); // 2.5s debounce
+    try {
+        console.log('[Google Sheets] Đang đồng bộ lên Google Sheet...');
+        await exportAllToGoogleSheets(db);
+        console.log('[Google Sheets] Đồng bộ hoàn tất.');
+    } catch (e) {
+        console.warn('[Google Sheets Sync Warning]:', e.message);
+    }
 }
 
 module.exports = {
@@ -502,6 +507,7 @@ module.exports = {
     testConnection,
     testConnectionWithCredentials,
     exportTableToGoogleSheets,
+    exportTablesToGoogleSheets,
     exportAllToGoogleSheets,
     importAllFromGoogleSheets,
     triggerBackgroundSync

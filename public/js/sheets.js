@@ -259,8 +259,7 @@ const appSheets = (() => {
     }
 
     function autoSync() {
-        if (!currentConfig || currentConfig.autoSyncOnSave === false) return;
-        if (!connectionStatus || !connectionStatus.success) return;
+        if (currentConfig && currentConfig.autoSyncOnSave === false) return;
 
         const user = (typeof appAuth !== 'undefined' && typeof appAuth.getCurrentUser === 'function')
             ? appAuth.getCurrentUser()
