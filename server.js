@@ -69,12 +69,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Verify password with Bcrypt and auto-upgrade from plain-text
 async function verifyPassword(inputPassword, storedPassword) {
     if (!storedPassword || !inputPassword) return false;
-    
+
     // Check if stored password is a bcrypt hash
     if (storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$')) {
         return await bcrypt.compare(inputPassword, storedPassword);
     }
-    
+
     // Legacy plain-text fallback
     return inputPassword === storedPassword;
 }
@@ -136,7 +136,7 @@ function ensureDefaultAccounts(db) {
     const adminHash = bcrypt.hashSync('123456', SALT_ROUNDS);
 
     // 1. Ensure Super Admin account (Huỳnh Thanh Long)
-    let adminAcc = accounts.find(a => 
+    let adminAcc = accounts.find(a =>
         (a.employee_id && (a.employee_id === 'TH-0001' || a.employee_id === 'TH-1948')) ||
         (a.account_email && (a.account_email.toLowerCase() === 'longht@trunghaico.vn' || a.account_email.toLowerCase() === 'admin@trunghai.vn')) ||
         (a.username && (a.username.toLowerCase() === 'longht' || a.username.toLowerCase() === 'admin'))
@@ -168,7 +168,7 @@ function ensureDefaultAccounts(db) {
     }
 
     // 2. Ensure Standard User demo account (Trần Minh Đức)
-    let userAcc = accounts.find(a => 
+    let userAcc = accounts.find(a =>
         (a.employee_id && a.employee_id === 'TH-0003') ||
         (a.account_email && a.account_email.toLowerCase() === 'test@trunghaico.vn')
     );
@@ -205,7 +205,7 @@ function loadDatabase() {
             inMemoryDb = db;
             return db;
         }
-    } catch (e) {}
+    } catch (e) { }
 
     try {
         if (fs.existsSync(DB_PATH)) {
@@ -257,7 +257,7 @@ function saveDatabase(data) {
     try {
         fs.writeFileSync(TMP_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
         saved = true;
-    } catch (e) {}
+    } catch (e) { }
 
     // Tự động đồng bộ cập nhật vào file Excel HRM_Database_Normalized.xlsx
     setTimeout(() => syncToExcelFile(data), 10);
@@ -488,7 +488,7 @@ app.get('/api/employees', (req, res) => {
 
     if (search) {
         const q = search.toLowerCase().trim();
-        result = result.filter(e => 
+        result = result.filter(e =>
             (e.employee_id && e.employee_id.toLowerCase().includes(q)) ||
             (e.full_name && e.full_name.toLowerCase().includes(q)) ||
             (e.mobile_phone && e.mobile_phone.includes(q)) ||
@@ -1677,7 +1677,7 @@ app.post('/api/employees', async (req, res) => {
     const pos = db.tables['02_Positions'] || [];
     const deptObj = depts.find(d => d.department_id === body.department_id) || {};
     const posObj = pos.find(p => p.position_id === body.position_id) || {};
-    
+
     // Auto-generate employee_id if not provided
     let newId = body.employee_id;
     if (!newId) {
@@ -2277,7 +2277,7 @@ app.get('/api/trash', (req, res) => {
 });
 
 // RESTORE EMPLOYEE FROM RECYCLE BIN
-app.post('/api/trash/restore/:id', (req, res) => {
+app.post('/api/trash/restore/:id', async (req, res) => {
     const db = loadDatabase();
     const id = req.params.id;
     const trash = db.tables['13_Recycle_Bin'] || [];
@@ -2388,7 +2388,7 @@ app.post('/api/trash/restore-bulk', async (req, res) => {
             let backup = {};
             try {
                 backup = JSON.parse(trashItem.backup_data || '{}');
-            } catch (e) {}
+            } catch (e) { }
 
             if (backup.employee) {
                 if (!db.tables['03_Employees']) db.tables['03_Employees'] = [];
@@ -2867,9 +2867,9 @@ app.post('/api/login', loginLimiter, async (req, res) => {
         const contacts = db.tables['04_Contacts_Addresses'] || [];
 
         const q = username.toLowerCase().trim();
-        
+
         // Find account by username, employee_id, account_email, or admin aliases
-        let userAcc = accounts.find(a => 
+        let userAcc = accounts.find(a =>
             (a.username && a.username.toLowerCase().trim() === q) ||
             (a.employee_id && a.employee_id.toLowerCase().trim() === q) ||
             (a.account_email && a.account_email.toLowerCase().trim() === q) ||
@@ -2878,10 +2878,10 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
         // Fallback: match by employee profile work_email or mobile_phone
         if (!userAcc) {
-            const matchedEmp = employees.find(e => 
+            const matchedEmp = employees.find(e =>
                 (e.employee_id && e.employee_id.toLowerCase().trim() === q) ||
                 (e.work_email && e.work_email.toLowerCase().trim() === q)
-            ) || contacts.find(c => 
+            ) || contacts.find(c =>
                 (c.employee_id && c.employee_id.toLowerCase().trim() === q) ||
                 (c.work_email && c.work_email.toLowerCase().trim() === q)
             );
@@ -3394,7 +3394,7 @@ app.post('/api/sheets/config', async (req, res) => {
             try {
                 const tmpKeyFilePath = path.join(os.tmpdir(), 'service-account.json');
                 fs.writeFileSync(tmpKeyFilePath, JSON.stringify(parsedCreds, null, 2), 'utf-8');
-            } catch (e) {}
+            } catch (e) { }
         } catch (e) {
             console.error('Error handling credentials in /api/sheets/config:', e.message);
         }
@@ -3418,7 +3418,7 @@ app.post('/api/sheets/sync-to-cloud', async (req, res) => {
     try {
         const db = loadDatabase();
         const result = await googleSheets.exportAllToGoogleSheets(db);
-        
+
         recordLog(db, {
             action_type: 'SYNC_CLOUD',
             module: 'Cơ sở dữ liệu',
@@ -3595,7 +3595,7 @@ app.post('/api/setup/complete', async (req, res) => {
 
         // 3. Prepare Database
         let db = loadDatabase();
-        
+
         // Handle Super Admin Profile & Account
         const adminId = admin?.employee_id || 'TH-0001';
         const adminName = admin?.full_name || 'Quản Trị Viên';
