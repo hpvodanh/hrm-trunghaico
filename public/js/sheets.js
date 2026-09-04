@@ -51,6 +51,18 @@ const appSheets = (() => {
         }
 
         if (statusBox) {
+            const saEmail = connectionStatus?.serviceAccountEmail || currentConfig?.serviceAccountEmail || '';
+            const emailHtml = saEmail ? `
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.12); font-size: 11.5px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <i class="fa-solid fa-envelope"></i> Service Account: <strong>${saEmail}</strong>
+                    </span>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="appSheets.copyEmail('${saEmail}')" style="height: 24px; font-size: 11px; padding: 0 8px; flex-shrink: 0;">
+                        <i class="fa-regular fa-copy"></i> Sao chép
+                    </button>
+                </div>
+            ` : '';
+
             if (connectionStatus && connectionStatus.success) {
                 statusBox.className = 'sheets-status-card success';
                 statusBox.innerHTML = `
@@ -64,6 +76,7 @@ const appSheets = (() => {
                     <div style="font-size: 11.5px; color: #065F46;">
                         ✓ Đã xác thực 14 bảng dữ liệu (${connectionStatus.sheets ? connectionStatus.sheets.length : 0} tabs sẵn sàng)
                     </div>
+                    ${emailHtml}
                 `;
             } else {
                 statusBox.className = 'sheets-status-card warning';
@@ -75,6 +88,7 @@ const appSheets = (() => {
                     <div style="font-size: 11.5px; color: #B45309; line-height: 1.4;">
                         ${connectionStatus?.message || 'Vui lòng dán Link hoặc ID của Google Trang tính và nhấn "Lưu & Kết nối".'}
                     </div>
+                    ${emailHtml}
                 `;
             }
         }
@@ -222,13 +236,23 @@ const appSheets = (() => {
         }
     }
 
+    function copyEmail(email) {
+        if (!email) return;
+        navigator.clipboard.writeText(email).then(() => {
+            utils.showToast('Đã sao chép email Service Account!', 'success');
+        }).catch(() => {
+            utils.showToast('Email: ' + email, 'info');
+        });
+    }
+
     return {
         init: loadStatus,
         openModal,
         closeModal,
         saveConfig,
         syncToCloud,
-        pullFromCloud
+        pullFromCloud,
+        copyEmail
     };
 })();
 

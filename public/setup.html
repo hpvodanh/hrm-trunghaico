@@ -136,9 +136,14 @@
               <div style="font-size: 11.5px; font-weight: normal; color: #047857;" id="badge-client-email">Email: -</div>
             </div>
           </div>
-          <button type="button" class="btn-setup btn-setup-secondary" id="btn-reselect-file" style="height: 32px; font-size: 12px; padding: 0 12px;">
-            <i class="fa-solid fa-arrows-rotate"></i> Chọn lại
-          </button>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn-setup btn-setup-secondary" id="btn-copy-vercel-env" onclick="appSetup.copyVercelEnv()" style="height: 32px; font-size: 12px; padding: 0 12px;">
+              <i class="fa-solid fa-copy"></i> Sao chép cho Vercel
+            </button>
+            <button type="button" class="btn-setup btn-setup-secondary" id="btn-reselect-file" style="height: 32px; font-size: 12px; padding: 0 12px;">
+              <i class="fa-solid fa-arrows-rotate"></i> Chọn lại
+            </button>
+          </div>
         </div>
       </section>
 

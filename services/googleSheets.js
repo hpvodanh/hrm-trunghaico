@@ -184,12 +184,62 @@ function getSheetsClient(customCredentials) {
     return google.sheets({ version: 'v4', auth });
 }
 
+// Get Service Account information (email, project_id)
+function getServiceAccountInfo() {
+    if (activeCredentials && activeCredentials.client_email) {
+        return {
+            email: activeCredentials.client_email,
+            projectId: activeCredentials.project_id
+        };
+    }
+    if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+        try {
+            const creds = typeof process.env.GOOGLE_SERVICE_ACCOUNT_JSON === 'string'
+                ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+                : process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+            if (creds && creds.client_email) {
+                return {
+                    email: creds.client_email,
+                    projectId: creds.project_id
+                };
+            }
+        } catch (e) {}
+    }
+
+    const cfg = getConfig();
+    const candidatePaths = [];
+    if (cfg.keyFilePath) {
+        candidatePaths.push(path.isAbsolute(cfg.keyFilePath) ? cfg.keyFilePath : path.join(__dirname, '..', cfg.keyFilePath));
+    }
+    candidatePaths.push(path.join(os.tmpdir(), 'service-account.json'));
+    candidatePaths.push(path.join(__dirname, '..', 'config', 'hrm-trunghaico-507602-fd746f1db385.json'));
+    candidatePaths.push(path.join(__dirname, '..', 'config', 'service-account.json'));
+
+    for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+            try {
+                const creds = JSON.parse(fs.readFileSync(p, 'utf-8'));
+                if (creds && creds.client_email) {
+                    return { email: creds.client_email, projectId: creds.project_id };
+                }
+            } catch (e) {}
+        }
+    }
+    return null;
+}
+
 // Test connection to Google Spreadsheet
 async function testConnection(customSpreadsheetId) {
     const cfg = getConfig();
     const spreadsheetId = (customSpreadsheetId !== undefined ? customSpreadsheetId : cfg.spreadsheetId) || '';
+    const saInfo = getServiceAccountInfo();
+
     if (!spreadsheetId.trim()) {
-        return { success: false, message: 'Chưa cấu hình Google Spreadsheet ID' };
+        return {
+            success: false,
+            message: 'Chưa cấu hình Google Spreadsheet ID',
+            serviceAccountEmail: saInfo?.email || ''
+        };
     }
 
     try {
@@ -201,17 +251,19 @@ async function testConnection(customSpreadsheetId) {
             title: res.data.properties.title,
             spreadsheetId,
             sheets: sheetList,
+            serviceAccountEmail: saInfo?.email || '',
             message: `Đã kết nối thành công tới "${res.data.properties.title}" (${sheetList.length} tabs)`
         };
     } catch (e) {
         return {
             success: false,
             spreadsheetId,
+            serviceAccountEmail: saInfo?.email || '',
             error: e.message,
             message: e.message.includes('not supported for this document')
                 ? 'File hiện tại là định dạng Excel (.xlsx). Vui lòng vào Tệp > "Lưu dưới dạng Google Trang tính" trên Google Drive và dùng ID của file Google Trang tính mới.'
                 : e.message.includes('The caller does not have permission') || e.message.includes('not found')
-                ? 'Không tìm thấy file hoặc chưa cấp quyền chia sẻ (Editor) cho Service Account email.'
+                ? `Không tìm thấy file hoặc chưa cấp quyền chia sẻ (Editor) cho Service Account: ${saInfo?.email || 'email Service Account'}.`
                 : e.message
         };
     }
@@ -433,6 +485,7 @@ module.exports = {
     getConfig,
     saveConfig,
     setActiveCredentials,
+    getServiceAccountInfo,
     testConnection,
     testConnectionWithCredentials,
     exportTableToGoogleSheets,

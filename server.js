@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -122,6 +123,8 @@ function optionalAuth(req, res, next) {
 
 // Path to JSON database
 const DB_PATH = path.join(__dirname, 'database_schema.json');
+const TMP_DB_PATH = path.join(os.tmpdir(), 'database_schema.json');
+let inMemoryDb = null;
 
 // Ensure default admin & demo accounts exist in database
 function ensureDefaultAccounts(db) {
@@ -191,11 +194,25 @@ function ensureDefaultAccounts(db) {
 
 // Helper to load DB
 function loadDatabase() {
+    if (inMemoryDb && inMemoryDb.tables && Object.keys(inMemoryDb.tables).length > 0) {
+        return inMemoryDb;
+    }
+    try {
+        if (fs.existsSync(TMP_DB_PATH)) {
+            const raw = fs.readFileSync(TMP_DB_PATH, 'utf-8');
+            const db = JSON.parse(raw);
+            ensureDefaultAccounts(db);
+            inMemoryDb = db;
+            return db;
+        }
+    } catch (e) {}
+
     try {
         if (fs.existsSync(DB_PATH)) {
             const raw = fs.readFileSync(DB_PATH, 'utf-8');
             const db = JSON.parse(raw);
             ensureDefaultAccounts(db);
+            inMemoryDb = db;
             return db;
         }
     } catch (e) {
@@ -203,6 +220,7 @@ function loadDatabase() {
     }
     const db = { tables: {} };
     ensureDefaultAccounts(db);
+    inMemoryDb = db;
     return db;
 }
 
@@ -220,24 +238,32 @@ function syncToExcelFile(db) {
         }
         XLSX.writeFile(wb, EXCEL_DB_PATH);
     } catch (e) {
-        // Handle lock if file is open in Microsoft Excel
-        console.warn('⚠️ Ghi chú đồng bộ Excel (Có thể file đang mở trong MS Excel):', e.message);
+        // Handle lock if file is open in Microsoft Excel or on read-only system
+        console.warn('⚠️ Ghi chú đồng bộ Excel (file đang mở hoặc môi trường read-only):', e.message);
     }
 }
 
 // Helper to save DB
 function saveDatabase(data) {
+    inMemoryDb = data;
+    let saved = false;
     try {
         fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-        // Tự động đồng bộ cập nhật vào file Excel HRM_Database_Normalized.xlsx
-        setTimeout(() => syncToExcelFile(data), 10);
-        // Tự động đồng bộ cập nhật lên Google Sheets (nếu đã kết nối)
-        googleSheets.triggerBackgroundSync(data);
-        return true;
+        saved = true;
     } catch (e) {
-        console.error('Error saving database_schema.json:', e);
-        return false;
+        // Read-only filesystem (e.g. Vercel)
     }
+
+    try {
+        fs.writeFileSync(TMP_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+        saved = true;
+    } catch (e) {}
+
+    // Tự động đồng bộ cập nhật vào file Excel HRM_Database_Normalized.xlsx
+    setTimeout(() => syncToExcelFile(data), 10);
+    // Tự động đồng bộ cập nhật lên Google Sheets (nếu đã kết nối)
+    googleSheets.triggerBackgroundSync(data);
+    return saved;
 }
 
 // ==========================================
@@ -3274,18 +3300,23 @@ app.post('/api/company/upload-logo', (req, res) => {
         else if (mimeType.includes('webp')) ext = 'webp';
 
         const buffer = Buffer.from(matches[2], 'base64');
-        const uploadsDir = path.join(__dirname, 'public', 'uploads');
-        if (!fs.existsSync(uploadsDir)) {
-            fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-
         const fileName = `company_logo_${Date.now()}.${ext}`;
         const filePath = path.join(uploadsDir, fileName);
-        fs.writeFileSync(filePath, buffer);
+        let finalLogoUrl = `uploads/${fileName}`;
+
+        try {
+            if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+            fs.writeFileSync(filePath, buffer);
+        } catch (e) {
+            console.warn('Cannot write logo to disk (Vercel read-only), using base64 URL directly:', e.message);
+            finalLogoUrl = imageBase64;
+        }
 
         const db = loadDatabase();
         if (!db.company_info) db.company_info = { ...DEFAULT_COMPANY_INFO };
-        db.company_info.logo_url = `uploads/${fileName}`;
+        db.company_info.logo_url = finalLogoUrl;
 
         recordLog(db, {
             action_type: 'UPDATE',
@@ -3319,11 +3350,13 @@ app.post('/api/company/upload-logo', (req, res) => {
 app.get('/api/sheets/config', async (req, res) => {
     const cfg = googleSheets.getConfig();
     const status = await googleSheets.testConnection();
+    const saInfo = googleSheets.getServiceAccountInfo ? googleSheets.getServiceAccountInfo() : null;
     res.json({
         success: true,
         config: {
             spreadsheetId: cfg.spreadsheetId || '',
-            autoSyncOnSave: cfg.autoSyncOnSave !== false
+            autoSyncOnSave: cfg.autoSyncOnSave !== false,
+            serviceAccountEmail: saInfo?.email || status?.serviceAccountEmail || ''
         },
         connection: status
     });
@@ -3331,13 +3364,27 @@ app.get('/api/sheets/config', async (req, res) => {
 
 // UPDATE CONFIG & TEST CONNECTION
 app.post('/api/sheets/config', async (req, res) => {
-    const { spreadsheetId, autoSyncOnSave } = req.body;
+    const { spreadsheetId, autoSyncOnSave, credentials } = req.body;
     let cleanId = (spreadsheetId || '').trim();
     
     // Extract ID if user pastes full URL
     const match = cleanId.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (match) {
         cleanId = match[1];
+    }
+
+    if (credentials) {
+        try {
+            const parsedCreds = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
+            googleSheets.setActiveCredentials(parsedCreds);
+            process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(parsedCreds);
+            try {
+                const tmpKeyFilePath = path.join(os.tmpdir(), 'service-account.json');
+                fs.writeFileSync(tmpKeyFilePath, JSON.stringify(parsedCreds, null, 2), 'utf-8');
+            } catch (e) {}
+        } catch (e) {
+            console.error('Error handling credentials in /api/sheets/config:', e.message);
+        }
     }
 
     googleSheets.saveConfig({
@@ -3497,15 +3544,35 @@ app.post('/api/setup/complete', async (req, res) => {
 
         const parsedCreds = typeof credentials === 'string' ? JSON.parse(credentials) : credentials;
 
-        // 1. Save credentials file
-        const keyFilePath = path.join(__dirname, 'config', 'service-account.json');
-        const configDir = path.join(__dirname, 'config');
-        if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
-        fs.writeFileSync(keyFilePath, JSON.stringify(parsedCreds, null, 2), 'utf-8');
+        // 1. Cache & Set in-memory credentials immediately
+        googleSheets.setActiveCredentials(parsedCreds);
+        process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(parsedCreds);
+        process.env.GOOGLE_SPREADSHEET_ID = spreadsheetId.trim();
+
+        let chosenKeyPath = './config/hrm-trunghaico-507602-fd746f1db385.json';
+
+        // Try writing to config/ directory (works on local machine/VPS)
+        try {
+            const keyFilePath = path.join(__dirname, 'config', 'service-account.json');
+            const configDir = path.join(__dirname, 'config');
+            if (!fs.existsSync(configDir)) fs.mkdirSync(configDir, { recursive: true });
+            fs.writeFileSync(keyFilePath, JSON.stringify(parsedCreds, null, 2), 'utf-8');
+            chosenKeyPath = './config/service-account.json';
+        } catch (err) {
+            console.warn('[Setup Complete] Config directory is read-only (Vercel Serverless environment):', err.message);
+        }
+
+        // Always write to os.tmpdir() as fallback for Serverless
+        try {
+            const tmpKeyFilePath = path.join(os.tmpdir(), 'service-account.json');
+            fs.writeFileSync(tmpKeyFilePath, JSON.stringify(parsedCreds, null, 2), 'utf-8');
+        } catch (err) {
+            console.warn('[Setup Complete] Cannot write to tmp directory:', err.message);
+        }
 
         // 2. Save sheets configuration
         googleSheets.saveConfig({
-            keyFilePath: './config/service-account.json',
+            keyFilePath: chosenKeyPath,
             spreadsheetId: spreadsheetId.trim(),
             autoSyncOnSave: true,
             is_setup_completed: true
@@ -3615,9 +3682,9 @@ app.post('/api/setup/complete', async (req, res) => {
 
         saveDatabase(db);
 
-        // 4. Export all 14 tables directly to Google Sheets
+        // 4. Export all 14 tables directly to Google Sheets (passing credentials directly to avoid disk dependency)
         console.log('[Setup Wizard] Đang đẩy 14 bảng dữ liệu lên Google Sheets...');
-        await googleSheets.exportAllToGoogleSheets(db);
+        await googleSheets.exportAllToGoogleSheets(db, spreadsheetId.trim(), parsedCreds);
         console.log('[Setup Wizard] Đã đồng bộ Google Sheets thành công!');
 
         res.json({

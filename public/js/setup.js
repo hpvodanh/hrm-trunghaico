@@ -250,6 +250,19 @@ const appSetup = {
     });
   },
 
+  copyVercelEnv() {
+    if (!this.credentials) {
+      this.showToast('Chưa có dữ liệu Service Account JSON. Vui lòng tải file lên trước.', 'error');
+      return;
+    }
+    const jsonStr = JSON.stringify(this.credentials);
+    navigator.clipboard.writeText(jsonStr).then(() => {
+      this.showToast('Đã sao chép! Bạn có thể dán vào biến GOOGLE_SERVICE_ACCOUNT_JSON trên Vercel.', 'success');
+    }).catch(() => {
+      this.showToast('Không thể tự động sao chép, vui lòng sao chép thủ công.', 'error');
+    });
+  },
+
   async testConnection() {
     const sheetInput = document.getElementById('input-sheet-id').value.trim();
     const sheetId = this.extractSheetId(sheetInput);
@@ -386,13 +399,47 @@ const appSetup = {
         this.showToast('Khởi tạo hệ thống thành công!', 'success');
       } else {
         if (statusText) {
-          statusText.innerHTML = `<span style="color: #DC2626;"><i class="fa-solid fa-circle-exclamation"></i> Lỗi: ${data.message}</span>`;
+          statusText.innerHTML = `
+            <div style="background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px 18px; margin: 16px auto; max-width: 540px; text-align: left;">
+              <div style="color: #B91C1C; font-weight: 700; font-size: 13.5px; margin-bottom: 6px;">
+                <i class="fa-solid fa-circle-exclamation"></i> Lỗi trong quá trình khởi tạo:
+              </div>
+              <div style="color: #991B1B; font-size: 12.5px; line-height: 1.5; margin-bottom: 12px;">
+                ${data.message}
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn-setup btn-setup-secondary" onclick="appSetup.goToStep(5)" style="height: 32px; font-size: 12px; padding: 0 14px;">
+                  <i class="fa-solid fa-arrow-left"></i> Quay lại Bước 5
+                </button>
+                <button type="button" class="btn-setup btn-setup-primary" onclick="appSetup.completeSetup()" style="height: 32px; font-size: 12px; padding: 0 14px;">
+                  <i class="fa-solid fa-rotate-right"></i> Thử lại
+                </button>
+              </div>
+            </div>
+          `;
         }
         this.showToast(data.message || 'Lỗi khi khởi tạo hệ thống', 'error');
       }
     } catch (e) {
       if (statusText) {
-        statusText.innerHTML = `<span style="color: #DC2626;"><i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối: ${e.message}</span>`;
+        statusText.innerHTML = `
+          <div style="background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 8px; padding: 14px 18px; margin: 16px auto; max-width: 540px; text-align: left;">
+            <div style="color: #B91C1C; font-weight: 700; font-size: 13.5px; margin-bottom: 6px;">
+              <i class="fa-solid fa-circle-exclamation"></i> Lỗi kết nối máy chủ:
+            </div>
+            <div style="color: #991B1B; font-size: 12.5px; line-height: 1.5; margin-bottom: 12px;">
+              ${e.message}
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn-setup btn-setup-secondary" onclick="appSetup.goToStep(5)" style="height: 32px; font-size: 12px; padding: 0 14px;">
+                <i class="fa-solid fa-arrow-left"></i> Quay lại Bước 5
+              </button>
+              <button type="button" class="btn-setup btn-setup-primary" onclick="appSetup.completeSetup()" style="height: 32px; font-size: 12px; padding: 0 14px;">
+                <i class="fa-solid fa-rotate-right"></i> Thử lại
+              </button>
+            </div>
+          </div>
+        `;
       }
       this.showToast('Lỗi: ' + e.message, 'error');
     }
