@@ -14,6 +14,14 @@ function setActiveCredentials(creds) {
     activeCredentials = typeof creds === 'string' ? JSON.parse(creds) : creds;
 }
 
+function extractSpreadsheetId(input) {
+    if (!input || typeof input !== 'string') return '';
+    let id = input.trim();
+    const match = id.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) return match[1];
+    return id.split('/')[0].split('?')[0].split('#')[0].trim();
+}
+
 // Helper to get config
 function getConfig() {
     let baseConfig = {
@@ -43,7 +51,7 @@ function getConfig() {
     }
 
     if (process.env.GOOGLE_SPREADSHEET_ID) {
-        baseConfig.spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+        baseConfig.spreadsheetId = extractSpreadsheetId(process.env.GOOGLE_SPREADSHEET_ID);
     }
 
     return baseConfig;
@@ -51,6 +59,9 @@ function getConfig() {
 
 // Helper to save config
 function saveConfig(cfg) {
+    if (cfg && cfg.spreadsheetId) {
+        cfg.spreadsheetId = extractSpreadsheetId(cfg.spreadsheetId);
+    }
     inMemoryConfig = { ...(inMemoryConfig || getConfig()), ...cfg };
     if (cfg && cfg.spreadsheetId) {
         process.env.GOOGLE_SPREADSHEET_ID = cfg.spreadsheetId;
@@ -231,7 +242,7 @@ function getServiceAccountInfo() {
 // Test connection to Google Spreadsheet
 async function testConnection(customSpreadsheetId) {
     const cfg = getConfig();
-    const spreadsheetId = (customSpreadsheetId !== undefined ? customSpreadsheetId : cfg.spreadsheetId) || '';
+    const spreadsheetId = extractSpreadsheetId(customSpreadsheetId !== undefined ? customSpreadsheetId : cfg.spreadsheetId);
     const saInfo = getServiceAccountInfo();
 
     if (!spreadsheetId.trim()) {
@@ -271,7 +282,8 @@ async function testConnection(customSpreadsheetId) {
 
 // Test connection to Google Spreadsheet with custom credentials
 async function testConnectionWithCredentials(credentials, spreadsheetId) {
-    if (!spreadsheetId || !spreadsheetId.trim()) {
+    const cleanId = extractSpreadsheetId(spreadsheetId);
+    if (!cleanId || !cleanId.trim()) {
         return { success: false, message: 'Chưa cung cấp Google Spreadsheet ID' };
     }
     if (!credentials) {
@@ -484,6 +496,7 @@ function triggerBackgroundSync(db) {
 module.exports = {
     getConfig,
     saveConfig,
+    extractSpreadsheetId,
     setActiveCredentials,
     getServiceAccountInfo,
     testConnection,

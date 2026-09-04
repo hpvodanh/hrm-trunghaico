@@ -230,11 +230,12 @@ const appSetup = {
 
   extractSheetId(input) {
     if (!input) return '';
-    const match = input.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    let str = input.trim();
+    const match = str.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (match && match[1]) {
       return match[1];
     }
-    return input.trim();
+    return str.split('/')[0].split('?')[0].split('#')[0].trim();
   },
 
   copyServiceEmail() {

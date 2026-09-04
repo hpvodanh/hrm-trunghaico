@@ -123,8 +123,8 @@ const appSheets = (() => {
 
         let rawId = inputId ? inputId.value.trim() : '';
         const match = rawId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-        const spreadsheetId = match ? match[1] : rawId;
-        if (match && inputId) {
+        const spreadsheetId = match ? match[1] : rawId.split('/')[0].split('?')[0].split('#')[0].trim();
+        if (inputId && spreadsheetId) {
             inputId.value = spreadsheetId;
         }
 

@@ -3365,13 +3365,7 @@ app.get('/api/sheets/config', async (req, res) => {
 // UPDATE CONFIG & TEST CONNECTION
 app.post('/api/sheets/config', async (req, res) => {
     const { spreadsheetId, autoSyncOnSave, credentials } = req.body;
-    let cleanId = (spreadsheetId || '').trim();
-    
-    // Extract ID if user pastes full URL
-    const match = cleanId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match) {
-        cleanId = match[1];
-    }
+    const cleanId = googleSheets.extractSpreadsheetId(spreadsheetId);
 
     if (credentials) {
         try {
@@ -3521,7 +3515,8 @@ app.post('/api/setup/validate-json', (req, res) => {
 app.post('/api/setup/verify-sheet', async (req, res) => {
     try {
         const { credentials, spreadsheetId } = req.body;
-        const result = await googleSheets.testConnectionWithCredentials(credentials, spreadsheetId);
+        const cleanId = googleSheets.extractSpreadsheetId(spreadsheetId);
+        const result = await googleSheets.testConnectionWithCredentials(credentials, cleanId);
         res.json(result);
     } catch (e) {
         res.status(500).json({
@@ -3535,6 +3530,7 @@ app.post('/api/setup/verify-sheet', async (req, res) => {
 app.post('/api/setup/complete', async (req, res) => {
     try {
         let { credentials, spreadsheetId, dataOption, admin } = req.body;
+        spreadsheetId = googleSheets.extractSpreadsheetId(spreadsheetId);
         if (!spreadsheetId || !spreadsheetId.trim()) {
             return res.status(400).json({ success: false, message: 'Chưa cung cấp Google Spreadsheet ID' });
         }
